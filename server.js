@@ -7,7 +7,7 @@ const PORT = process.env.PORT || 3000;
 const API_SECRET = process.env.API_SECRET || 'SAGE_CLOUD_SECRET_2026';
 
 // Ensure data folder exists
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.VERCEL ? '/tmp/sage_data' : path.join(__dirname, 'data');
 if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -48,6 +48,9 @@ function normalizePhone(p) {
 
 // Body parser helper
 function getBody(req) {
+    if (req.body && typeof req.body === 'object') {
+        return Promise.resolve(req.body);
+    }
     return new Promise((resolve) => {
         let chunks = [];
         req.on('data', chunk => chunks.push(chunk));
@@ -594,7 +597,7 @@ function sendJson(res, data, status = 200) {
 // ─────────────────────────────────────────────────────────────────────────────
 // 4. SERVER & REQUEST DISPATCHER
 // ─────────────────────────────────────────────────────────────────────────────
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
     // Enable CORS for all requests
     if (req.method === 'OPTIONS') {
         res.writeHead(204, {
@@ -721,12 +724,17 @@ const server = http.createServer(async (req, res) => {
         console.error('Server error:', err);
         sendJson(res, { status: 'ERROR', message: 'Internal server error: ' + err.message }, 500);
     }
-});
+}
 
-server.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(` SAGE SMS 24/7 Cloud Portal running on port ${PORT}`);
-    console.log(` - Online Registration: http://localhost:${PORT}/register`);
-    console.log(` - Parent Portal:       http://localhost:${PORT}/`);
-    console.log(`=======================================================`);
-});
+module.exports = handleRequest;
+
+if (require.main === module) {
+    const server = http.createServer(handleRequest);
+    server.listen(PORT, () => {
+        console.log(`=======================================================`);
+        console.log(` SAGE SMS 24/7 Cloud Portal running on port ${PORT}`);
+        console.log(` - Online Registration: http://localhost:${PORT}/register`);
+        console.log(` - Parent Portal:       http://localhost:${PORT}/`);
+        console.log(`=======================================================`);
+    });
+}
