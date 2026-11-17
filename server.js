@@ -44,6 +44,12 @@ function writeJson(file, data) {
     }
 }
 
+// Normalize student code (strips prefixes and leading zeros)
+function normalizeCode(c) {
+    if (!c) return '';
+    return String(c).trim().toUpperCase().replace(/^(STU-|SAGE-|SAGE)/i, '').replace(/^0+/, '');
+}
+
 // Normalize phone numbers (strips country code / leading zeros, takes last 9 digits)
 function normalizePhone(p) {
     if (!p) return '';
@@ -436,31 +442,47 @@ function renderRegistrationPage() {
 // 2. PARENT WEB PORTAL (/) — 24/7 with Student ID + Phone Verification
 // ─────────────────────────────────────────────────────────────────────────────
 function handleParentPortal(req, res, query) {
-    const code = (query.get('code') || '').trim();
-    const phone = (query.get('phone') || '').trim();
+    const rawCode = (query.get('code') || '').trim();
+    const rawPhone = (query.get('phone') || '').trim();
 
-    if (!code || !phone) {
-        return sendHtml(res, renderLoginPage(null, code, phone));
+    if (!rawCode || !rawPhone) {
+        return sendHtml(res, renderLoginPage(null, rawCode, rawPhone));
     }
 
     const students = readJson(STUDENTS_FILE, []);
-    const normInput = normalizePhone(phone);
+    const normCode = normalizeCode(rawCode);
+    const normInputPhone = normalizePhone(rawPhone);
 
     const student = students.find(s => {
-        const idMatch = String(s.studentCode || s.id) === code || String(s.id) === code;
+        // Match code against studentCode, regNumber, or internal id
+        const sCode = normalizeCode(s.studentCode);
+        const sReg = normalizeCode(s.regNumber);
+        const sId = normalizeCode(s.id);
+
+        const idMatch = (
+            (sCode && (sCode === normCode || String(s.studentCode).trim() === rawCode)) ||
+            (sReg && (sReg === normCode || String(s.regNumber).trim() === rawCode)) ||
+            (sId && (sId === normCode || String(s.id).trim() === rawCode))
+        );
         if (!idMatch) return false;
 
+        // Match phone against phone, whatsapp, guardianPhone, emergencyContact
+        const p1 = normalizePhone(s.phone);
+        const p2 = normalizePhone(s.whatsapp);
+        const p3 = normalizePhone(s.guardianPhone);
+        const p4 = normalizePhone(s.emergencyContact);
+
         const pMatch = (
-            normInput === normalizePhone(s.phone) ||
-            normInput === normalizePhone(s.whatsapp) ||
-            normInput === normalizePhone(s.guardianPhone) ||
-            normInput === normalizePhone(s.emergencyContact)
+            (p1 && (normInputPhone === p1 || p1.endsWith(normInputPhone) || normInputPhone.endsWith(p1))) ||
+            (p2 && (normInputPhone === p2 || p2.endsWith(normInputPhone) || normInputPhone.endsWith(p2))) ||
+            (p3 && (normInputPhone === p3 || p3.endsWith(normInputPhone) || normInputPhone.endsWith(p3))) ||
+            (p4 && (normInputPhone === p4 || p4.endsWith(normInputPhone) || normInputPhone.endsWith(p4)))
         );
         return pMatch;
     });
 
     if (!student) {
-        return sendHtml(res, renderLoginPage('🔒 Security Verification Failed: Student ID and Registered Phone Number do not match our institute records. (ලියාපදිංචි කර ඇති දුරකථන අංකය ඇතුළත් කරන්න)', code, ''));
+        return sendHtml(res, renderLoginPage('🔒 Security Verification Failed: Student ID and Registered Phone Number do not match our institute records. Please check the Student ID / Smart Card or enter the Guardian\'s registered mobile phone number. (ලියාපදිංචි කර ඇති දුරකථන අංකය නිවැරදිව ඇතුළත් කරන්න)', rawCode, ''));
     }
 
     sendHtml(res, renderStudentDashboard(student));
