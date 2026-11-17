@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sage-sms-portal
+    env: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    envVars:
+      - key: API_SECRET
+        value: SAGE_CLOUD_SECRET_2026
+      - key: PORT
+        value: 10000
