@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "name": "English Language & Literature",
+    "grade": "A/L Science",
+    "fee": 2000,
+    "teacherName": "Senior Lecturer"
+  },
+  {
+    "id": 2,
+    "name": "Sinhala Language & Literature",
+    "grade": "Grade 11 (O/L)",
+    "fee": 1500,
+    "teacherName": "Senior Teacher"
+  },
+  {
+    "id": 3,
+    "name": "Combined Mathematics",
+    "grade": "Grade 12 (A/L)",
+    "fee": 2500,
+    "teacherName": "Mathematics Dept"
+  },
+  {
+    "id": 4,
+    "name": "Physics",
+    "grade": "Grade 12 (A/L)",
+    "fee": 2500,
+    "teacherName": "Science Dept"
+  },
+  {
+    "id": 5,
+    "name": "Chemistry",
+    "grade": "Grade 12 (A/L)",
+    "fee": 2500,
+    "teacherName": "Science Dept"
+  },
+  {
+    "id": 6,
+    "name": "Biology",
+    "grade": "Grade 12 (A/L)",
+    "fee": 2500,
+    "teacherName": "Biology Dept"
+  },
+  {
+    "id": 7,
+    "name": "Mathematics (ගණිතය)",
+    "grade": "Grade 11 (O/L)",
+    "fee": 1800,
+    "teacherName": "Mathematics Dept"
+  },
+  {
+    "id": 8,
+    "name": "Science (විද්‍යාව)",
+    "grade": "Grade 11 (O/L)",
+    "fee": 1800,
+    "teacherName": "Science Dept"
+  },
+  {
+    "id": 9,
+    "name": "Information Technology (ICT)",
+    "grade": "Grade 11 & A/L",
+    "fee": 2000,
+    "teacherName": "IT Dept"
+  }
+]

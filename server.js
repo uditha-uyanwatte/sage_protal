@@ -16,11 +16,16 @@ const ADMISSIONS_FILE = path.join(DATA_DIR, 'admissions.json');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
 const CLASSES_FILE = path.join(DATA_DIR, 'classes.json');
 
-// Helper to read JSON
+// Helper to read JSON (with fallback to bundled repository data)
 function readJson(file, defaultValue = []) {
     try {
         if (fs.existsSync(file)) {
             return JSON.parse(fs.readFileSync(file, 'utf8'));
+        }
+        const baseName = path.basename(file);
+        const bundled = path.join(__dirname, 'data', baseName);
+        if (bundled !== file && fs.existsSync(bundled)) {
+            return JSON.parse(fs.readFileSync(bundled, 'utf8'));
         }
     } catch (e) {
         console.error('Error reading ' + file, e);
