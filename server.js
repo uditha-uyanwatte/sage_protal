@@ -311,6 +311,40 @@ function renderRegistrationPage() {
                     <input type="text" name="address" placeholder="Address">
                 </div>
 
+                <div class="section-title">👨‍👩‍👧‍👦 Siblings Information / සහෝදර සහෝදරියන්ගේ විස්තර (Optional)</div>
+                <div style="background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; padding:14px; margin-bottom:16px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; cursor:pointer;">
+                        <input type="checkbox" id="hasSiblingsCheck" onchange="document.getElementById('siblingsBox').style.display = this.checked ? 'block' : 'none';" style="accent-color:#b91c1c; width:16px; height:16px;">
+                        <span>Student has brother(s) or sister(s) studying at SAGE / Elsewhere<br>
+                        <span style="font-size:11px; font-weight:normal; color:#64748b;">(ආයතනයේ හෝ වෙනත් පාසලක ඉගෙනුම ලබන සහෝදර සහෝදරියන් සිටී නම් මෙතැන ලකුණු කරන්න)</span></span>
+                    </label>
+                    <div id="siblingsBox" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #cbd5e1;">
+                        <div class="row">
+                            <div class="col form-group">
+                                <label>Sibling Full Name (සහෝදර/සහෝදරියගේ නම)</label>
+                                <input type="text" name="siblingName" placeholder="e.g. Nimesh Perera">
+                            </div>
+                            <div class="col form-group">
+                                <label>Relationship (සම්බන්ධය)</label>
+                                <select name="siblingRelation">
+                                    <option value="Brother">Brother (සහෝදරයා)</option>
+                                    <option value="Sister">Sister (සහෝදරිය)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col form-group">
+                                <label>Sibling's Student ID at SAGE <span class="hint">(දැනටමත් SAGE හි ඉගෙනුම ලබන්නේ නම් ශිෂ්‍ය අංකය)</span></label>
+                                <input type="text" name="siblingStudentCode" placeholder="e.g. 10042 (For Sibling Discount)">
+                            </div>
+                            <div class="col form-group">
+                                <label>Grade / School (ශ්‍රේණිය / පාසල)</label>
+                                <input type="text" name="siblingGrade" placeholder="e.g. Grade 10 / Royal College">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="section-title">📚 Select Classes to Enroll (අයදුම් කරන පන්ති)</div>
                 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:16px;">
                     ${classHtml}
@@ -634,6 +668,15 @@ async function handleRequest(req, res) {
             const admissions = readJson(ADMISSIONS_FILE, []);
             const refNo = 'SAGE-ADM-' + (1000 + (Date.now() % 100000));
 
+            let siblingInfo = null;
+            if (body.siblingName && body.siblingName.trim()) {
+                const sName = body.siblingName.trim();
+                const sRel = body.siblingRelation || 'Sibling';
+                const sCode = (body.siblingStudentCode || '').trim();
+                const sGrade = (body.siblingGrade || '').trim();
+                siblingInfo = `${sName} (${sRel}${sCode ? ', SAGE ID: ' + sCode : ''}${sGrade ? ', ' + sGrade : ''})`;
+            }
+
             const newAdm = {
                 id: admissions.length + 1,
                 refNo: refNo,
@@ -649,6 +692,7 @@ async function handleRequest(req, res) {
                 guardianPhone: (body.guardianPhone || '').trim(),
                 address: (body.address || '').trim(),
                 requestedClasses: (body.requestedClasses || '').trim(),
+                siblingInfo: siblingInfo,
                 status: 'PENDING',
                 submittedAt: new Date().toISOString()
             };
