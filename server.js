@@ -338,9 +338,13 @@ function renderRegistrationPage() {
                                 <input type="text" name="siblingStudentCode" placeholder="e.g. 10042 (For Sibling Discount)">
                             </div>
                             <div class="col form-group">
-                                <label>Grade / School (ශ්‍රේණිය / පාසල)</label>
-                                <input type="text" name="siblingGrade" placeholder="e.g. Grade 10 / Royal College">
+                                <label>Sibling's Date of Birth <span class="hint">(උපන් දිනය - DOB)</span></label>
+                                <input type="date" name="siblingDob">
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Sibling's Grade / School (ශ්‍රේණිය / පාසල)</label>
+                            <input type="text" name="siblingGrade" placeholder="e.g. Grade 10 / Royal College">
                         </div>
                     </div>
                 </div>
@@ -673,8 +677,9 @@ async function handleRequest(req, res) {
                 const sName = body.siblingName.trim();
                 const sRel = body.siblingRelation || 'Sibling';
                 const sCode = (body.siblingStudentCode || '').trim();
+                const sDob = (body.siblingDob || '').trim();
                 const sGrade = (body.siblingGrade || '').trim();
-                siblingInfo = `${sName} (${sRel}${sCode ? ', SAGE ID: ' + sCode : ''}${sGrade ? ', ' + sGrade : ''})`;
+                siblingInfo = `${sName} (${sRel}${sCode ? ', SAGE ID: ' + sCode : ''}${sDob ? ', DOB: ' + sDob : ''}${sGrade ? ', ' + sGrade : ''})`;
             }
 
             const newAdm = {
