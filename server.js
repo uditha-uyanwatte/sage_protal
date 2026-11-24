@@ -1160,6 +1160,30 @@ function renderStaffScannerPage() {
         .pill-b { background: #1e3a8a; color: #93c5fd; }
         .btn-edit-fee { background: #1e293b; border: 1px solid #475569; color: #fde68a; font-size: 11px; font-weight: 800; border-radius: 7px; padding: 4px 7px; cursor: pointer; }
         .btn-del { background: transparent; border: none; color: #64748b; font-size: 15px; cursor: pointer; padding: 4px 6px; }
+
+        /* Per-Student Gate Fee Selection Modal (When Day Fee tick is OFF) */
+        .fee-modal-bg { display: none; position: fixed; inset: 0; background: rgba(2,6,23,0.82); z-index: 200; align-items: flex-end; justify-content: center; padding: 12px; }
+        @media (min-width: 520px) { .fee-modal-bg { align-items: center; } }
+        .fee-modal-bg.open { display: flex; }
+        .fee-modal { background: #1e293b; border: 1.5px solid #475569; border-radius: 20px; width: 100%; max-width: 440px; padding: 18px 16px 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.65); animation: pop 0.16s ease-out; }
+        .fm-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 12px; }
+        .fm-stu { font-size: 19px; font-weight: 900; color: #fff; }
+        .fm-sub { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+        .fm-status { border-radius: 12px; padding: 10px 12px; font-size: 12.5px; font-weight: 800; margin: 10px 0; line-height: 1.4; }
+        .fm-st-paid { background: #064e3b; border: 1.5px solid #34d399; color: #a7f3d0; }
+        .fm-st-unpaid { background: #7f1d1d; border: 1.5px solid #f87171; color: #fecaca; }
+        .fm-amt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; }
+        .fm-amt-row label { font-size: 12px; font-weight: 700; color: #cbd5e1; }
+        .fm-amt-row input { width: 115px; padding: 7px 10px; background: #1e293b; border: 1.5px solid #4ade80; border-radius: 8px; color: #4ade80; font-size: 15px; font-weight: 900; text-align: right; outline: none; }
+        .fm-btn-stack { display: flex; flex-direction: column; gap: 8px; }
+        .fm-btn { width: 100%; padding: 13px 14px; border-radius: 12px; font-size: 14.5px; font-weight: 800; cursor: pointer; border: 1.5px solid transparent; display: flex; align-items: center; justify-content: center; gap: 7px; }
+        .fm-btn-already { background: linear-gradient(135deg, #059669, #047857); border-color: #34d399; color: #fff; }
+        .fm-btn-monthly { background: linear-gradient(135deg, #16a34a, #15803d); border-color: #4ade80; color: #fff; }
+        .fm-btn-day { background: linear-gradient(135deg, #0284c7, #0369a1); border-color: #38bdf8; color: #fff; }
+        .fm-btn-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .fm-btn-free { background: #4338ca; border-color: #818cf8; color: #fff; }
+        .fm-btn-unpaid { background: #991b1b; border-color: #f87171; color: #fff; }
+        .fm-btn-cancel { background: #0f172a; border-color: #475569; color: #94a3b8; padding: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -1210,10 +1234,10 @@ function renderStaffScannerPage() {
                 <div class="fee-mode-bar">
                     <label class="fee-mode-toggle">
                         <input type="checkbox" id="autoDayFeeCheck" onchange="saveFeePrefs()">
-                        <span>💵 Auto Day Fee on Unpaid Scan</span>
+                        <span>💵 Day Fee Tick (Auto Day Fee)</span>
                     </label>
                     <div class="dayfee-box">
-                        <span>Day Fee LKR</span>
+                        <span>LKR</span>
                         <input type="number" id="dayFeeAmountInput" value="200" min="0" step="50" onchange="saveFeePrefs()">
                     </div>
                 </div>
@@ -1285,6 +1309,49 @@ function renderStaffScannerPage() {
         </div>
     </div>
 
+    <!-- PER-STUDENT ATTENDANCE FEE SELECTION MODAL (WHEN DAY FEE TICK IS OFF) -->
+    <div id="feeModalBg" class="fee-modal-bg">
+        <div class="fee-modal">
+            <div class="fm-head">
+                <div>
+                    <div style="font-size:10.5px; font-weight:800; color:#fde68a; letter-spacing:0.6px;">⚡ ATTENDANCE FEE SELECTION</div>
+                    <div class="fm-stu" id="fmStuName">Student Name</div>
+                    <div class="fm-sub" id="fmStuSub">Code • Grade</div>
+                </div>
+                <span class="pill pill-b" id="fmMonthTag">2026-11</span>
+            </div>
+
+            <div style="margin-bottom:8px;">
+                <label style="display:block; font-size:11.5px; font-weight:700; color:#94a3b8; margin-bottom:4px;">Class (පන්තිය):</label>
+                <select id="fmClassSelect" class="class-select" onchange="updateFeeModalClassInfo()"></select>
+            </div>
+
+            <div id="fmStatusBox" class="fm-status fm-st-unpaid"></div>
+
+            <div class="fm-amt-row">
+                <label for="fmMonthlyAmt">💰 Monthly Fee Amount (LKR):</label>
+                <input type="number" id="fmMonthlyAmt" min="0" step="100" value="2000" oninput="document.getElementById('fmBtnMonthly').textContent='💰 Monthly Paid — LKR ' + Number(this.value||0).toLocaleString() + ' (මාසික ගාස්තුව)';">
+            </div>
+
+            <div class="fm-btn-stack">
+                <button type="button" id="fmBtnAlreadyPaid" class="fm-btn fm-btn-already" style="display:none;" onclick="confirmModalChoice('ALREADY_PAID')">
+                    ✅ Confirm Present — Already Paid (ගෙවා ඇත)
+                </button>
+                <button type="button" id="fmBtnMonthly" class="fm-btn fm-btn-monthly" onclick="confirmModalChoice('MONTHLY_PAID')">
+                    💰 Monthly Paid (මාසික ගාස්තුව ගෙව්වා)
+                </button>
+                <button type="button" id="fmBtnDayFee" class="fm-btn fm-btn-day" style="display:none;" onclick="confirmModalChoice('DAY_FEE')">
+                    💵 Collect Day Fee (දින ගාස්තුව)
+                </button>
+                <div class="fm-btn-row2">
+                    <button type="button" class="fm-btn fm-btn-free" onclick="confirmModalChoice('FREE_CARD')">🎟️ Free Card (නොමිලේ)</button>
+                    <button type="button" class="fm-btn fm-btn-unpaid" onclick="confirmModalChoice('NOT_PAID')">❌ Not Paid (නොගෙවූ)</button>
+                </div>
+                <button type="button" class="fm-btn fm-btn-cancel" onclick="closeFeeModal()">✖ Cancel (අවලංගු කරන්න)</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let STAFF_PIN = '';
         let STAFF_NAME = '';
@@ -1299,6 +1366,10 @@ function renderStaffScannerPage() {
         let facingMode = 'environment';
         let lastQrCode = '';
         let lastQrAt = 0;
+        let MODAL_OPEN = false;
+        let MODAL_STUDENT = null;
+        let MODAL_EDIT_SCAN_ID = null;
+        let TODAY_NAME = '';
 
         // Restore staff name, fee preferences & active session on load
         window.addEventListener('DOMContentLoaded', () => {
@@ -1404,6 +1475,7 @@ function renderStaffScannerPage() {
                 STUDENTS = data.students || [];
                 TODAY_DATE = data.todayDate;
                 CURRENT_MONTH = data.currentMonth;
+                TODAY_NAME = data.todayName || '';
 
                 localStorage.setItem('sage_staff_name', STAFF_NAME);
                 sessionStorage.setItem('sage_staff_pin', STAFF_PIN);
@@ -1470,7 +1542,7 @@ function renderStaffScannerPage() {
                 if (aT !== bT) return aT - bT;
                 return String(a.name || '').localeCompare(String(b.name || ''));
             });
-            let html = '<option value="">🚪 General Gate Attendance (All Classes)</option>';
+            let html = '<option value="">⚡ Auto-Detect Enrolled Class (ස්වයංක්‍රීය)</option>';
             sorted.forEach(c => {
                 const isToday = tUp && String(c.dayOfWeek || '').toUpperCase() === tUp;
                 const tag = isToday ? '★ TODAY • ' : (c.dayOfWeek ? c.dayOfWeek.slice(0,3) + ' • ' : '');
@@ -1573,10 +1645,11 @@ function renderStaffScannerPage() {
         }
 
         function onQrDecoded(text) {
+            if (MODAL_OPEN) return;
             const now = Date.now();
             const clean = String(text || '').trim();
             if (!clean) return;
-            if (clean === lastQrCode && (now - lastQrAt) < 3500) return;
+            if (clean === lastQrCode && (now - lastQrAt) < 3000) return;
             lastQrCode = clean;
             lastQrAt = now;
             processToken(clean, false);
@@ -1614,103 +1687,263 @@ function renderStaffScannerPage() {
             }
 
             const selEl = document.getElementById('classSelect');
-            const classId = selEl.value ? Number(selEl.value) : null;
-            const classObj = classId ? CLASSES.find(c => Number(c.id) === classId) : null;
-            const className = classObj ? classObj.name : 'General Gate Attendance';
-            const defaultClassFee = classObj ? Number(classObj.fee || 0) : 0;
+            let classId = selEl.value ? Number(selEl.value) : null;
+            const enrolled = Array.isArray(stu.enrolledClasses) ? stu.enrolledClasses : [];
 
-            // Duplicate check for today + class -> show existing card with fee-edit option if not already pre-paid!
-            const dup = SCANS.find(x => String(x.studentCode) === String(stu.studentCode) && String(x.classId || '') === String(classId || ''));
-            if (dup) {
-                playBeep('warn');
-                const feeTxt = formatFeeSummary(dup);
-                const allowEdit = dup.feeStatus !== 'PAID';
-                showScanCard('res-warn', '⚠️ ALREADY MARKED TODAY (දැනටමත් ලකුණු කර ඇත)', stu, className, feeTxt + ' • Scanned at ' + dup.timeStr, null, allowEdit ? dup : null);
+            // Auto-pick single enrolled class when top selector is on Auto-Detect
+            if (!classId && enrolled.length === 1) {
+                classId = Number(enrolled[0].id);
+            }
+
+            // MODE A: Day Fee Tick IS CHECKED -> auto-apply Day Fee (skipping if already paid Monthly!)
+            if (isAutoDayFee() && classId) {
+                const classObj = CLASSES.find(c => Number(c.id) === classId);
+                const matchEnr = enrolled.find(ec => Number(ec.id) === classId);
+                const className = (classObj && classObj.name) || (matchEnr && matchEnr.className) || 'Class';
+                const classFee = (matchEnr && Number(matchEnr.fee || 0) > 0)
+                    ? Number(matchEnr.fee)
+                    : (classObj ? Number(classObj.fee || 0) : 0);
+
+                // Duplicate check for today + class
+                const dup = SCANS.find(x => String(x.studentCode) === String(stu.studentCode) && Number(x.classId || 0) === classId);
+                if (dup) {
+                    playBeep('warn');
+                    showScanCard('res-warn', '⚠️ ALREADY MARKED TODAY (දැනටමත් ලකුණු කර ඇත)', stu, className, formatFeeSummary(dup) + ' • Scanned at ' + dup.timeStr, null, dup.feeStatus !== 'PAID' ? dup : null);
+                    return;
+                }
+
+                // Already paid Monthly Fee this month -> DO NOT double-charge Day Fee!
+                if (matchEnr && matchEnr.paidThisMonth) {
+                    saveAndUploadScan(stu, classId, className, classFee, 'PAID', 'NONE', 0,
+                        'res-paid', '✅ PRESENT • ALREADY PAID THIS MONTH (ගෙවා ඇත)',
+                        'No Day Fee charged • Receipt: ' + (matchEnr.paidReceiptNo || CURRENT_MONTH), false);
+                    playBeep('paid');
+                    return;
+                }
+
+                // Auto collect Day Fee!
+                const dAmt = getDayFeeAmount();
+                saveAndUploadScan(stu, classId, className, classFee, 'DAY_FEE', 'DAY_FEE', dAmt,
+                    'res-dayfee', '💵 PRESENT • DAY FEE COLLECTED (දින ගාස්තුව)',
+                    'Day Fee Cash Collected: LKR ' + dAmt.toLocaleString() + (matchEnr ? '' : ' • Auto-enrolled on PC sync'), true);
+                playBeep('paid');
                 return;
             }
 
+            // MODE B: Day Fee Tick is UNCHECKED (or multiple classes on Auto-Detect) ->
+            // Open Fee Selection Modal for EVERY student scanned!
+            openFeeModal(stu, classId, null);
+        }
+
+        function openFeeModal(stu, preferredClassId, existingScanId) {
+            MODAL_OPEN = true;
+            MODAL_STUDENT = stu;
+            MODAL_EDIT_SCAN_ID = existingScanId || null;
+
+            document.getElementById('fmStuName').textContent = stu.fullName || 'Student';
+            document.getElementById('fmStuSub').textContent = (stu.studentCode || stu.id) + ' • ' + (stu.grade || '-');
+            document.getElementById('fmMonthTag').textContent = CURRENT_MONTH || '';
+
+            // Populate modal class selector: student's enrolled classes first, then all institute classes
             const enrolled = Array.isArray(stu.enrolledClasses) ? stu.enrolledClasses : [];
-            let feeStatus = 'GENERAL';
-            let paymentType = 'NONE';
-            let collectedAmount = 0;
-            let classFee = defaultClassFee;
-            let feeDetail = '';
-            let cardClass = 'res-paid';
-            let statusBanner = '✅ PRESENT • GATE CHECK-IN OK';
-            let showFeeButtons = false;
+            const enrIds = new Set(enrolled.map(e => Number(e.id)));
+            const sel = document.getElementById('fmClassSelect');
+            let opts = '';
+            if (enrolled.length > 0) {
+                opts += '<optgroup label="★ Student Enrolled Classes">';
+                enrolled.forEach(ec => {
+                    const paidMark = ec.paidThisMonth ? ' ✅ PAID' : ' ❌ UNPAID';
+                    opts += '<option value="' + escHtml(ec.id) + '">' + escHtml(ec.className + paidMark) + '</option>';
+                });
+                opts += '</optgroup>';
+            }
+            const others = CLASSES.filter(c => !enrIds.has(Number(c.id)));
+            if (others.length > 0) {
+                opts += '<optgroup label="Other Institute Classes (Auto-Enroll)">';
+                others.forEach(c => {
+                    opts += '<option value="' + escHtml(c.id) + '">' + escHtml(c.name + (c.grade ? ' - ' + c.grade : '')) + '</option>';
+                });
+                opts += '</optgroup>';
+            }
+            if (!opts) {
+                opts = '<option value="">🚪 General Gate Attendance</option>';
+            }
+            sel.innerHTML = opts;
 
-            if (classId) {
-                const matchEnr = enrolled.find(ec => Number(ec.id) === classId);
-                if (!matchEnr && !forceNotEnrolled) {
-                    playBeep('warn');
-                    showScanCard(
-                        'res-notenr',
-                        '⚠️ NOT ENROLLED IN THIS CLASS (පන්තියට ලියාපදිංචි නැත)',
-                        stu,
-                        className,
-                        'Enrolled in: ' + (enrolled.length ? enrolled.map(e => e.className).join(', ') : 'None'),
-                        token,
-                        null
-                    );
-                    return;
-                }
-                if (matchEnr && Number(matchEnr.fee || 0) > 0) {
-                    classFee = Number(matchEnr.fee);
-                }
+            // Choose default selected class
+            if (preferredClassId && [...sel.options].some(o => Number(o.value) === Number(preferredClassId))) {
+                sel.value = String(preferredClassId);
+            } else if (enrolled.length > 0) {
+                // Prefer a class scheduled today if available
+                const tUp = String(TODAY_NAME || '').toUpperCase();
+                const todayClass = CLASSES.find(c => enrIds.has(Number(c.id)) && tUp && String(c.dayOfWeek || '').toUpperCase() === tUp);
+                sel.value = String(todayClass ? todayClass.id : enrolled[0].id);
+            }
 
+            // Show Day Fee button inside modal when Auto Day Fee mode needed class picking OR editing an existing scan
+            const dayBtn = document.getElementById('fmBtnDayFee');
+            if (isAutoDayFee() || existingScanId) {
+                dayBtn.style.display = 'flex';
+                dayBtn.textContent = '💵 Collect Day Fee — LKR ' + getDayFeeAmount().toLocaleString() + ' (දින ගාස්තුව)';
+            } else {
+                dayBtn.style.display = 'none';
+            }
+
+            updateFeeModalClassInfo();
+            document.getElementById('feeModalBg').classList.add('open');
+            playBeep('warn');
+        }
+
+        function updateFeeModalClassInfo() {
+            if (!MODAL_STUDENT) return;
+            const selVal = document.getElementById('fmClassSelect').value;
+            const cid = selVal ? Number(selVal) : null;
+            const enrolled = Array.isArray(MODAL_STUDENT.enrolledClasses) ? MODAL_STUDENT.enrolledClasses : [];
+            const matchEnr = cid ? enrolled.find(ec => Number(ec.id) === cid) : null;
+            const classObj = cid ? CLASSES.find(c => Number(c.id) === cid) : null;
+
+            const fee = (matchEnr && Number(matchEnr.fee || 0) > 0)
+                ? Number(matchEnr.fee)
+                : (classObj ? Number(classObj.fee || 0) : 0);
+            document.getElementById('fmMonthlyAmt').value = fee > 0 ? fee : 2000;
+
+            const dup = SCANS.find(x =>
+                String(x.studentCode) === String(MODAL_STUDENT.studentCode) &&
+                Number(x.classId || 0) === Number(cid || 0) &&
+                (!MODAL_EDIT_SCAN_ID || x.scanId !== MODAL_EDIT_SCAN_ID)
+            );
+            const alreadyPaidLocally = SCANS.some(x =>
+                String(x.studentCode) === String(MODAL_STUDENT.studentCode) &&
+                Number(x.classId || 0) === Number(cid || 0) &&
+                x.feeStatus === 'MONTHLY_PAID' &&
+                (!MODAL_EDIT_SCAN_ID || x.scanId !== MODAL_EDIT_SCAN_ID)
+            );
+
+            const isPaid = Boolean((matchEnr && matchEnr.paidThisMonth) || alreadyPaidLocally);
+            const stBox = document.getElementById('fmStatusBox');
+            const alreadyBtn = document.getElementById('fmBtnAlreadyPaid');
+
+            if (isPaid) {
+                stBox.className = 'fm-status fm-st-paid';
+                stBox.innerHTML = '✅ ALREADY PAID THIS MONTH! (මෙම මාසයේ ගෙවා ඇත)' +
+                    (matchEnr && matchEnr.paidReceiptNo ? '<br>Receipt: ' + escHtml(matchEnr.paidReceiptNo) + ' • ' + escHtml(matchEnr.paidDate || '') : '') +
+                    (dup ? '<br>⚠️ Already marked today at ' + escHtml(dup.timeStr) : '');
+                alreadyBtn.style.display = 'flex';
+            } else {
+                stBox.className = 'fm-status fm-st-unpaid';
+                stBox.innerHTML = '❌ UNPAID FOR ' + escHtml(CURRENT_MONTH) + ' (මෙම මාසයේ ගෙවා නැත)' +
+                    (fee > 0 ? ' • Class Fee: LKR ' + fee.toLocaleString() : '') +
+                    (!matchEnr && cid ? '<br>ℹ️ Student not yet enrolled — will auto-enroll on PC sync' : '') +
+                    (dup ? '<br>⚠️ Already scanned today (' + escHtml(formatFeeSummary(dup)) + ') — selecting below updates it' : '');
+                alreadyBtn.style.display = 'none';
+            }
+
+            document.getElementById('fmBtnMonthly').textContent = '💰 Monthly Paid — LKR ' + (fee > 0 ? fee.toLocaleString() : 'Enter Amt') + ' (මාසික ගාස්තුව)';
+        }
+
+        function closeFeeModal() {
+            document.getElementById('feeModalBg').classList.remove('open');
+            MODAL_OPEN = false;
+            MODAL_STUDENT = null;
+            MODAL_EDIT_SCAN_ID = null;
+            lastQrAt = Date.now();
+        }
+
+        function confirmModalChoice(choice) {
+            if (!MODAL_STUDENT) return;
+            const stu = MODAL_STUDENT;
+            const editId = MODAL_EDIT_SCAN_ID;
+            const selVal = document.getElementById('fmClassSelect').value;
+            const cid = selVal ? Number(selVal) : null;
+            const enrolled = Array.isArray(stu.enrolledClasses) ? stu.enrolledClasses : [];
+            const matchEnr = cid ? enrolled.find(ec => Number(ec.id) === cid) : null;
+            const classObj = cid ? CLASSES.find(c => Number(c.id) === cid) : null;
+            const className = (classObj && classObj.name) || (matchEnr && matchEnr.className) || 'General Gate Attendance';
+            const enteredAmt = Math.max(0, Number(document.getElementById('fmMonthlyAmt').value || 0));
+            const classFee = enteredAmt > 0 ? enteredAmt : ((matchEnr && Number(matchEnr.fee || 0)) || (classObj && Number(classObj.fee || 0)) || 0);
+
+            if (choice === 'MONTHLY_PAID') {
                 if (matchEnr && matchEnr.paidThisMonth) {
-                    feeStatus = 'PAID';
-                    paymentType = 'NONE';
-                    collectedAmount = 0;
-                    feeDetail = '✅ ALREADY PAID (' + CURRENT_MONTH + ')' + (matchEnr.paidReceiptNo ? ' • ' + matchEnr.paidReceiptNo : '');
-                    cardClass = 'res-paid';
-                    statusBanner = '✅ PRESENT • FEE PAID (ගෙවා ඇත)';
-                    playBeep('paid');
-                } else {
-                    showFeeButtons = true;
-                    if (isAutoDayFee()) {
-                        const dAmt = getDayFeeAmount();
-                        feeStatus = 'DAY_FEE';
-                        paymentType = 'DAY_FEE';
-                        collectedAmount = dAmt;
-                        feeDetail = '💵 DAY FEE COLLECTED: LKR ' + dAmt.toLocaleString() + (matchEnr ? '' : ' (Walk-in)');
-                        cardClass = 'res-dayfee';
-                        statusBanner = '💵 PRESENT • DAY FEE PAID (දින ගාස්තුව)';
-                        playBeep('paid');
-                    } else {
-                        feeStatus = 'NOT_PAID';
-                        paymentType = 'NONE';
-                        collectedAmount = 0;
-                        feeDetail = '❌ UNPAID FOR ' + CURRENT_MONTH + (classFee > 0 ? ' • Monthly Fee: LKR ' + classFee.toLocaleString() : '') + ' — Tap below if paying now:';
-                        cardClass = 'res-unpaid';
-                        statusBanner = '⚠️ PRESENT • FEE UNPAID (ගෙවා නැත!)';
-                        playBeep('unpaid');
+                    if (!confirm('⚠️ This student ALREADY PAID for ' + CURRENT_MONTH + ' (' + (matchEnr.paidReceiptNo || 'Paid') + ').\\n\\nRecord another Monthly Payment anyway?')) {
+                        return;
                     }
                 }
-            } else {
-                // General gate attendance
-                const unpaidCnt = enrolled.filter(e => !e.paidThisMonth).length;
-                if (enrolled.length > 0 && unpaidCnt === 0) {
-                    feeStatus = 'PAID';
-                    feeDetail = '✅ All ' + enrolled.length + ' classes paid for ' + CURRENT_MONTH;
-                    cardClass = 'res-paid';
-                    statusBanner = '✅ PRESENT • ALL FEES PAID';
-                    playBeep('paid');
-                } else if (unpaidCnt > 0) {
-                    feeStatus = 'NOT_PAID';
-                    feeDetail = '❌ ' + unpaidCnt + ' of ' + enrolled.length + ' class(es) unpaid for ' + CURRENT_MONTH + ' (Select a specific class above to collect Day/Monthly fee)';
-                    cardClass = 'res-unpaid';
-                    statusBanner = '⚠️ PRESENT • ' + unpaidCnt + ' UNPAID CLASS(ES)';
-                    playBeep('unpaid');
-                } else {
-                    feeStatus = 'GENERAL';
-                    feeDetail = 'General gate attendance recorded';
-                    cardClass = 'res-paid';
-                    statusBanner = '✅ PRESENT • GATE CHECK-IN';
-                    playBeep('paid');
+                if (enteredAmt <= 0) {
+                    alert('Please enter a valid Monthly Fee amount (LKR).');
+                    return;
                 }
             }
 
+            closeFeeModal();
+
+            // Check if updating an existing scan today for this student+class
+            let existing = editId
+                ? SCANS.find(x => x.scanId === editId)
+                : SCANS.find(x => String(x.studentCode) === String(stu.studentCode) && Number(x.classId || 0) === Number(cid || 0));
+
+            let feeStatus = 'NOT_PAID';
+            let paymentType = 'NONE';
+            let collectedAmount = 0;
+            let cardCls = 'res-unpaid';
+            let banner = '';
+            let detail = '';
+
+            if (choice === 'ALREADY_PAID') {
+                feeStatus = 'PAID';
+                cardCls = 'res-paid';
+                banner = '✅ PRESENT • ALREADY PAID (ගෙවා ඇත)';
+                detail = 'Verified Paid for ' + CURRENT_MONTH + (matchEnr && matchEnr.paidReceiptNo ? ' • ' + matchEnr.paidReceiptNo : '');
+                playBeep('paid');
+            } else if (choice === 'MONTHLY_PAID') {
+                feeStatus = 'MONTHLY_PAID';
+                paymentType = 'MONTHLY';
+                collectedAmount = enteredAmt;
+                cardCls = 'res-paid';
+                banner = '💰 PRESENT • MONTHLY PAID (මාසික ගාස්තුව)';
+                detail = 'Collected Cash: LKR ' + enteredAmt.toLocaleString() + ' • Receipt auto-creates on PC Pull!';
+                playBeep('paid');
+            } else if (choice === 'DAY_FEE') {
+                const dAmt = getDayFeeAmount();
+                feeStatus = 'DAY_FEE';
+                paymentType = 'DAY_FEE';
+                collectedAmount = dAmt;
+                cardCls = 'res-dayfee';
+                banner = '💵 PRESENT • DAY FEE COLLECTED (දින ගාස්තුව)';
+                detail = 'Collected Day Fee Cash: LKR ' + dAmt.toLocaleString() + ' • Syncing to Cloud!';
+                playBeep('paid');
+            } else if (choice === 'FREE_CARD') {
+                feeStatus = 'FREE_CARD';
+                cardCls = 'res-freecard';
+                banner = '🎟️ PRESENT • FREE CARD (නොමිලේ)';
+                detail = 'Marked authorized Free Card (Excluded from Not Paid list)';
+                playBeep('paid');
+            } else {
+                feeStatus = 'NOT_PAID';
+                cardCls = 'res-unpaid';
+                banner = '❌ PRESENT • NOT PAID (නොගෙවූ සිසුන්)';
+                detail = 'Added to Desktop Attendance -> Not Paid Students tab';
+                playBeep('unpaid');
+            }
+
+            if (existing) {
+                existing.classId = cid;
+                existing.className = className;
+                existing.classFee = classFee;
+                existing.feeStatus = feeStatus;
+                existing.paymentType = paymentType;
+                existing.collectedAmount = collectedAmount;
+                existing.uploaded = false;
+                saveLocalScans();
+                showScanCard(cardCls, banner, stu, className, detail, null, feeStatus !== 'PAID' ? existing : null);
+                renderLogAndStats();
+                uploadScans([existing]);
+            } else {
+                saveAndUploadScan(stu, cid, className, classFee, feeStatus, paymentType, collectedAmount,
+                    cardCls, banner, detail, feeStatus !== 'PAID');
+            }
+        }
+
+        function saveAndUploadScan(stu, classId, className, classFee, feeStatus, paymentType, collectedAmount, cardCls, banner, detail, showEditBtns) {
             const now = new Date();
             const timeStr = now.toTimeString().slice(0, 8);
             const scanObj = {
@@ -1734,7 +1967,7 @@ function renderStaffScannerPage() {
 
             SCANS.unshift(scanObj);
             saveLocalScans();
-            showScanCard(cardClass, statusBanner, stu, className, feeDetail, null, showFeeButtons ? scanObj : null);
+            showScanCard(cardCls, banner, stu, className, detail, null, showEditBtns ? scanObj : null);
             renderLogAndStats();
             uploadScans([scanObj]);
         }
@@ -1751,70 +1984,27 @@ function renderStaffScannerPage() {
         function setScanFeeAction(scanId, actionType) {
             const sc = SCANS.find(x => x.scanId === scanId);
             if (!sc) return;
-
-            let cardCls = 'res-unpaid';
-            let banner = '';
-            let detail = '';
-
-            if (actionType === 'MONTHLY_PAID') {
-                let amt = Number(sc.classFee || 0);
-                if (amt <= 0) {
-                    const entered = prompt('Enter Monthly Class Fee collected (LKR) for ' + sc.studentName + ':', '2000');
-                    if (entered === null) return;
-                    amt = Number(String(entered).replace(/[^0-9.]/g, ''));
-                    if (!amt || amt <= 0) return;
-                }
-                sc.feeStatus = 'MONTHLY_PAID';
-                sc.paymentType = 'MONTHLY';
-                sc.collectedAmount = amt;
-                cardCls = 'res-paid';
-                banner = '💰 MONTHLY FEE COLLECTED (මාසික ගාස්තුව)';
-                detail = 'Collected Cash: LKR ' + amt.toLocaleString() + ' • Receipt will auto-create on Desktop Pull!';
-                playBeep('paid');
-            } else if (actionType === 'DAY_FEE') {
-                const dAmt = getDayFeeAmount();
-                sc.feeStatus = 'DAY_FEE';
-                sc.paymentType = 'DAY_FEE';
-                sc.collectedAmount = dAmt;
-                cardCls = 'res-dayfee';
-                banner = '💵 DAY FEE COLLECTED (දින ගාස්තුව)';
-                detail = 'Collected Day Fee Cash: LKR ' + dAmt.toLocaleString() + ' • Syncing to Cloud!';
-                playBeep('paid');
-            } else if (actionType === 'FREE_CARD') {
-                sc.feeStatus = 'FREE_CARD';
-                sc.paymentType = 'NONE';
-                sc.collectedAmount = 0;
-                cardCls = 'res-freecard';
-                banner = '🎟️ FREE CARD MARKED (නොමිලේ)';
-                detail = 'Marked as authorized Free Card (Not counted in Unpaid list)';
-                playBeep('paid');
-            } else {
-                sc.feeStatus = 'NOT_PAID';
-                sc.paymentType = 'NONE';
-                sc.collectedAmount = 0;
-                cardCls = 'res-unpaid';
-                banner = '❌ MARKED NOT PAID (නොගෙවූ සිසුන්)';
-                detail = 'Will appear in Desktop Attendance -> Not Paid Students tab';
-                playBeep('warn');
+            const stu = STUDENTS.find(s => String(s.studentCode) === String(sc.studentCode)) || {
+                id: sc.studentId, studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade, enrolledClasses: []
+            };
+            if (actionType === 'MONTHLY_PAID' && Number(sc.classFee || 0) <= 0) {
+                openFeeModal(stu, sc.classId, sc.scanId);
+                return;
             }
-
-            sc.uploaded = false;
-            saveLocalScans();
-            const stuStub = { studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade };
-            showScanCard(cardCls, banner, stuStub, sc.className, detail, null, sc);
-            renderLogAndStats();
-            uploadScans([sc]);
+            MODAL_STUDENT = stu;
+            MODAL_EDIT_SCAN_ID = sc.scanId;
+            document.getElementById('fmClassSelect').innerHTML = '<option value="' + escHtml(sc.classId || '') + '">' + escHtml(sc.className) + '</option>';
+            document.getElementById('fmMonthlyAmt').value = sc.classFee || 2000;
+            confirmModalChoice(actionType);
         }
 
         function reopenFeeEditor(scanId) {
             const sc = SCANS.find(x => x.scanId === scanId);
             if (!sc) return;
-            const stuStub = { studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade };
-            const cls = sc.feeStatus === 'MONTHLY_PAID' || sc.feeStatus === 'PAID' ? 'res-paid'
-                : sc.feeStatus === 'DAY_FEE' ? 'res-dayfee'
-                : sc.feeStatus === 'FREE_CARD' ? 'res-freecard' : 'res-unpaid';
-            showScanCard(cls, '✎ UPDATE GATE FEE STATUS', stuStub, sc.className, formatFeeSummary(sc) + ' — Choose action below:', null, sc);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const stu = STUDENTS.find(s => String(s.studentCode) === String(sc.studentCode)) || {
+                id: sc.studentId, studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade, enrolledClasses: []
+            };
+            openFeeModal(stu, sc.classId, sc.scanId);
         }
 
         function showSimpleBanner(cls, title, msg) {
