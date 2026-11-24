@@ -5,6 +5,7 @@ const url = require('url');
 
 const PORT = process.env.PORT || 3000;
 const API_SECRET = process.env.API_SECRET || 'SAGE_CLOUD_SECRET_2026';
+const DEFAULT_STAFF_PIN = process.env.STAFF_PIN || '2026';
 
 // Ensure data folder exists
 const DATA_DIR = process.env.VERCEL ? '/tmp/sage_data' : path.join(__dirname, 'data');
@@ -15,6 +16,36 @@ if (!fs.existsSync(DATA_DIR)) {
 const ADMISSIONS_FILE = path.join(DATA_DIR, 'admissions.json');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
 const CLASSES_FILE = path.join(DATA_DIR, 'classes.json');
+const ATTENDANCE_FILE = path.join(DATA_DIR, 'mobile_attendance.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'portal_config.json');
+
+function getStaffPin() {
+    const cfg = readJson(CONFIG_FILE, {});
+    if (cfg && cfg.staffPin && String(cfg.staffPin).trim()) {
+        return String(cfg.staffPin).trim();
+    }
+    return DEFAULT_STAFF_PIN;
+}
+
+function getSlNow() {
+    return new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+}
+
+function getSlDateStr() {
+    return getSlNow().toISOString().slice(0, 10);
+}
+
+function isAuthorizedStaff(req, parsed, body) {
+    const pin = String(
+        req.headers['x-staff-pin'] ||
+        req.headers['x-sage-secret'] ||
+        (parsed && (parsed.searchParams.get('pin') || parsed.searchParams.get('key'))) ||
+        (body && (body.pin || body.key)) ||
+        ''
+    ).trim();
+    if (!pin) return false;
+    return pin === getStaffPin() || pin === API_SECRET;
+}
 
 // Helper to read JSON (with fallback to bundled repository data)
 function readJson(file, defaultValue = []) {
@@ -1012,6 +1043,730 @@ function renderStudentDashboard(s, linkedSiblings = [], verifiedPhone = '') {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 2B. STAFF MOBILE QR ATTENDANCE SCANNER (/staff-scan)
+// ─────────────────────────────────────────────────────────────────────────────
+function renderStaffScannerPage() {
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#7d1218">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>SAGE Staff Mobile QR Attendance Scanner</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; padding-bottom: 36px; }
+        .top-bar { background: linear-gradient(135deg, #7d1218 0%, #4c080d 100%); padding: 13px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 60; box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+        .top-bar h1 { font-size: 16px; font-weight: 800; letter-spacing: 0.2px; display: flex; align-items: center; gap: 7px; }
+        .top-actions { display: flex; gap: 6px; align-items: center; }
+        .btn-top { background: rgba(255,255,255,0.16); color: #fff; border: 1px solid rgba(255,255,255,0.28); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .btn-top:active { background: rgba(255,255,255,0.28); }
+        .wrap { max-width: 540px; margin: 0 auto; padding: 14px; }
+
+        /* Login Gate */
+        .login-card { background: #1e293b; border: 1px solid #334155; border-radius: 20px; padding: 28px 22px; margin-top: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        .login-badge { display: inline-block; background: rgba(185,28,28,0.25); color: #fca5a5; border: 1px solid rgba(248,113,113,0.35); padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .login-card h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+        .login-card p { font-size: 13px; color: #94a3b8; margin-bottom: 20px; line-height: 1.45; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; font-size: 12.5px; font-weight: 700; color: #cbd5e1; margin-bottom: 6px; }
+        .field input, .field select { width: 100%; padding: 12px 14px; background: #0f172a; border: 1.5px solid #334155; border-radius: 12px; color: #fff; font-size: 15px; outline: none; }
+        .field input:focus, .field select:focus { border-color: #f87171; box-shadow: 0 0 0 3px rgba(248,113,113,0.2); }
+        .btn-primary { width: 100%; padding: 14px; background: linear-gradient(135deg, #b91c1c, #7d1218); color: #fff; border: none; border-radius: 12px; font-size: 15.5px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(185,28,28,0.35); }
+        .btn-primary:disabled { opacity: 0.6; }
+        .err-box { background: rgba(220,38,38,0.18); border: 1px solid #ef4444; color: #fecaca; border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; display: none; }
+
+        /* Scanner App */
+        #scannerApp { display: none; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+        .card-label { font-size: 11.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+
+        .class-select { width: 100%; padding: 11px 12px; background: #0f172a; color: #f8fafc; border: 1.5px solid #475569; border-radius: 10px; font-size: 14px; font-weight: 700; outline: none; }
+        .class-select:focus { border-color: #f87171; }
+
+        #readerWrap { background: #020617; border-radius: 14px; overflow: hidden; border: 2px solid #334155; min-height: 220px; position: relative; display: flex; align-items: center; justify-content: center; }
+        #reader { width: 100%; }
+        #reader video { border-radius: 12px; }
+        .cam-placeholder { text-align: center; padding: 28px 16px; color: #94a3b8; font-size: 13px; }
+        .cam-controls { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 7px; margin-top: 10px; }
+        .btn-cam { padding: 10px 8px; border-radius: 10px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; font-size: 12.5px; font-weight: 700; cursor: pointer; text-align: center; }
+        .btn-cam.active { background: #15803d; border-color: #22c55e; color: #fff; }
+        .btn-cam.stop { background: #b91c1c; border-color: #ef4444; color: #fff; }
+
+        .manual-row { display: flex; gap: 8px; margin-top: 10px; }
+        .manual-row input { flex: 1; padding: 11px 12px; background: #0f172a; border: 1.5px solid #475569; border-radius: 10px; color: #fff; font-size: 14.5px; font-weight: 700; outline: none; }
+        .manual-row input:focus { border-color: #38bdf8; }
+        .manual-row button { padding: 0 16px; background: #2563eb; color: #fff; border: none; border-radius: 10px; font-weight: 800; font-size: 14px; cursor: pointer; white-space: nowrap; }
+
+        /* Instant Scan Result Banner */
+        #resultBox { display: none; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 2px solid transparent; animation: pop 0.18s ease-out; }
+        @keyframes pop { from { transform: scale(0.96); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
+        .res-paid { background: linear-gradient(135deg, #064e3b, #065f46); border-color: #34d399 !important; }
+        .res-unpaid { background: linear-gradient(135deg, #7f1d1d, #991b1b); border-color: #f87171 !important; }
+        .res-warn { background: linear-gradient(135deg, #78350f, #92400e); border-color: #fbbf24 !important; }
+        .res-notenr { background: linear-gradient(135deg, #4c1d95, #5b21b6); border-color: #a78bfa !important; }
+        .res-status { font-size: 13px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .res-name { font-size: 20px; font-weight: 900; color: #fff; margin-bottom: 3px; }
+        .res-meta { font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.5; }
+        .btn-force { margin-top: 10px; width: 100%; padding: 10px; background: #fde68a; color: #78350f; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: pointer; }
+
+        /* Stats Strip */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+        .stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 10px 6px; text-align: center; }
+        .stat .num { font-size: 20px; font-weight: 900; }
+        .stat .lbl { font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+
+        /* Cloud Sync Bar */
+        .sync-bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; }
+        .sync-txt { font-size: 12.5px; color: #cbd5e1; line-height: 1.35; }
+        .btn-sync { background: #0ea5e9; color: #fff; border: none; border-radius: 9px; padding: 8px 12px; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .btn-sync:disabled { opacity: 0.5; }
+
+        /* Scan Log */
+        .log-list { max-height: 310px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; }
+        .log-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 9px 11px; }
+        .log-left { min-width: 0; }
+        .log-name { font-size: 13.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .log-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+        .pill-g { background: #14532d; color: #86efac; }
+        .pill-r { background: #7f1d1d; color: #fca5a5; }
+        .pill-b { background: #1e3a8a; color: #93c5fd; }
+        .btn-del { background: transparent; border: none; color: #64748b; font-size: 15px; cursor: pointer; padding: 4px 6px; }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1>📷 SAGE Staff QR Scanner</h1>
+        <div class="top-actions" id="topActions" style="display:none;">
+            <button class="btn-top" id="soundBtn" onclick="toggleSound()">🔊</button>
+            <button class="btn-top" onclick="refreshRoster()" title="Reload updated fee & student list">🔄</button>
+            <button class="btn-top" onclick="logoutStaff()">🔒 Exit</button>
+        </div>
+    </div>
+
+    <div class="wrap">
+        <!-- 1. STAFF PIN LOCK SCREEN -->
+        <div id="loginView" class="login-card">
+            <span class="login-badge">🔒 AUTHORIZED STAFF ONLY</span>
+            <h2>Staff Gate Attendance Login</h2>
+            <p>Enter your name and the SAGE Staff Scanner PIN to unlock the mobile camera QR attendance scanner.<br>
+            <span style="font-size:12px; color:#cbd5e1;">(කාර්ය මණ්ඩල නම සහ Staff PIN අංකය ඇතුළත් කරන්න)</span></p>
+
+            <div id="loginErr" class="err-box"></div>
+
+            <form onsubmit="loginStaff(event)">
+                <div class="field">
+                    <label>Staff Name / Gate Counter (නම)</label>
+                    <input type="text" id="staffNameInput" placeholder="e.g. Nimal / Gate 1" required>
+                </div>
+                <div class="field">
+                    <label>Staff Scanner PIN (රහස් අංකය)</label>
+                    <input type="password" id="staffPinInput" inputmode="numeric" placeholder="Enter Staff PIN" required>
+                </div>
+                <button type="submit" id="loginBtn" class="btn-primary">🔓 Unlock QR Scanner →</button>
+            </form>
+            <div style="margin-top:16px; text-align:center; font-size:11.5px; color:#64748b;">
+                SAGE Higher Education Institute &bull; 24/7 Cloud Mobile Desk
+            </div>
+        </div>
+
+        <!-- 2. LIVE STAFF QR SCANNER WORKSPACE -->
+        <div id="scannerApp">
+            <!-- Class Selector -->
+            <div class="card">
+                <div class="card-label">
+                    <span>📚 Select Active Class (පන්තිය තෝරන්න)</span>
+                    <span id="rosterInfo" style="color:#38bdf8;">0 students</span>
+                </div>
+                <select id="classSelect" class="class-select" onchange="onClassChanged()"></select>
+            </div>
+
+            <!-- Instant Result Alert -->
+            <div id="resultBox"></div>
+
+            <!-- Camera Viewfinder -->
+            <div class="card">
+                <div class="card-label">
+                    <span>📷 Live QR Camera Scanner</span>
+                    <span id="staffTag" style="color:#fde68a;">Staff</span>
+                </div>
+                <div id="readerWrap">
+                    <div id="reader"></div>
+                    <div id="camPlaceholder" class="cam-placeholder">
+                        <div style="font-size:34px; margin-bottom:6px;">📱</div>
+                        Tap <b>▶ Start Camera</b> to scan Student PVC Card or Digital ID QR codes
+                    </div>
+                </div>
+                <div class="cam-controls">
+                    <button id="camToggleBtn" class="btn-cam active" onclick="toggleCamera()">▶ Start Camera</button>
+                    <button class="btn-cam" onclick="flipCamera()">🔄 Flip Cam</button>
+                    <button class="btn-cam" onclick="document.getElementById('qrFileInput').click()">🖼 QR Photo</button>
+                </div>
+                <input type="file" id="qrFileInput" accept="image/*" style="display:none;" onchange="scanFromFile(event)">
+
+                <!-- Manual Student ID Entry -->
+                <div class="manual-row">
+                    <input type="text" id="manualCodeInput" placeholder="Manual ID (e.g. 1001 or STU-1001)" onkeydown="if(event.key==='Enter'){event.preventDefault(); manualMark();}">
+                    <button type="button" onclick="manualMark()">✔ Mark</button>
+                </div>
+            </div>
+
+            <!-- Live Stats -->
+            <div class="stats-grid">
+                <div class="stat"><div class="num" id="stTotal" style="color:#f8fafc;">0</div><div class="lbl">Scanned</div></div>
+                <div class="stat"><div class="num" id="stPaid" style="color:#4ade80;">0</div><div class="lbl">Paid</div></div>
+                <div class="stat"><div class="num" id="stUnpaid" style="color:#f87171;">0</div><div class="lbl">Unpaid</div></div>
+                <div class="stat"><div class="num" id="stSynced" style="color:#38bdf8;">0</div><div class="lbl">Cloud OK</div></div>
+            </div>
+
+            <!-- Cloud Push Bar -->
+            <div class="sync-bar">
+                <div class="sync-txt" id="syncStatusTxt">☁️ Ready — scans upload automatically to SAGE Cloud</div>
+                <button class="btn-sync" id="pushAllBtn" onclick="pushAllToCloud()">☁️ Push All</button>
+            </div>
+
+            <!-- Today's Scan History -->
+            <div class="card">
+                <div class="card-label">
+                    <span>📋 Today's Scans (<span id="todayDateLbl"></span>)</span>
+                    <button style="background:none; border:none; color:#94a3b8; font-size:11px; cursor:pointer; font-weight:700;" onclick="clearLocalToday()">Clear Phone Log</button>
+                </div>
+                <div id="logList" class="log-list">
+                    <div style="text-align:center; color:#64748b; padding:18px; font-size:13px;">No students scanned yet today.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let STAFF_PIN = '';
+        let STAFF_NAME = '';
+        let CLASSES = [];
+        let STUDENTS = [];
+        let TODAY_DATE = '';
+        let CURRENT_MONTH = '';
+        let SCANS = [];
+        let soundEnabled = true;
+        let html5Qr = null;
+        let cameraRunning = false;
+        let facingMode = 'environment';
+        let lastQrCode = '';
+        let lastQrAt = 0;
+
+        // Restore staff name & active session on load
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedName = localStorage.getItem('sage_staff_name') || '';
+            if (savedName) document.getElementById('staffNameInput').value = savedName;
+            const savedPin = sessionStorage.getItem('sage_staff_pin') || '';
+            if (savedName && savedPin) {
+                document.getElementById('staffPinInput').value = savedPin;
+                doLogin(savedName, savedPin, true);
+            }
+        });
+
+        function normalizeCode(c) {
+            if (!c) return '';
+            return String(c).trim().toUpperCase().replace(/^(STU-|SAGE-|SAGE)/i, '').replace(/^0+/, '');
+        }
+
+        function escHtml(v) {
+            return String(v == null ? '' : v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function playBeep(type) {
+            if (!soundEnabled) return;
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const tone = (freq, start, dur, wave) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = wave || 'sine';
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(0.18, ctx.currentTime + start);
+                    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+                    o.connect(g); g.connect(ctx.destination);
+                    o.start(ctx.currentTime + start);
+                    o.stop(ctx.currentTime + start + dur);
+                };
+                if (type === 'paid') { tone(880, 0, 0.11); tone(1320, 0.11, 0.16); if (navigator.vibrate) navigator.vibrate(70); }
+                else if (type === 'unpaid') { tone(330, 0, 0.16, 'sawtooth'); tone(260, 0.2, 0.24, 'sawtooth'); if (navigator.vibrate) navigator.vibrate([140, 80, 180]); }
+                else if (type === 'warn') { tone(520, 0, 0.14, 'triangle'); if (navigator.vibrate) navigator.vibrate(90); }
+                else { tone(190, 0, 0.28, 'sawtooth'); if (navigator.vibrate) navigator.vibrate(220); }
+            } catch (e) {}
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundBtn').textContent = soundEnabled ? '🔊' : '🔇';
+        }
+
+        async function loginStaff(e) {
+            e.preventDefault();
+            const name = document.getElementById('staffNameInput').value.trim();
+            const pin = document.getElementById('staffPinInput').value.trim();
+            await doLogin(name, pin, false);
+        }
+
+        async function doLogin(name, pin, silent) {
+            const btn = document.getElementById('loginBtn');
+            const err = document.getElementById('loginErr');
+            err.style.display = 'none';
+            btn.disabled = true;
+            btn.textContent = 'Verifying PIN & Loading Roster...';
+
+            try {
+                const res = await fetch('/api/staff/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-STAFF-PIN': pin },
+                    body: JSON.stringify({ pin, staffName: name })
+                });
+                const data = await res.json();
+                if (res.status !== 200 || data.status !== 'OK') {
+                    if (!silent) {
+                        err.textContent = '🔒 ' + (data.message || 'Invalid Staff PIN. Please check with Admin.');
+                        err.style.display = 'block';
+                    }
+                    sessionStorage.removeItem('sage_staff_pin');
+                    btn.disabled = false;
+                    btn.textContent = '🔓 Unlock QR Scanner →';
+                    return;
+                }
+
+                STAFF_PIN = pin;
+                STAFF_NAME = name || 'Staff';
+                CLASSES = data.classes || [];
+                STUDENTS = data.students || [];
+                TODAY_DATE = data.todayDate;
+                CURRENT_MONTH = data.currentMonth;
+
+                localStorage.setItem('sage_staff_name', STAFF_NAME);
+                sessionStorage.setItem('sage_staff_pin', STAFF_PIN);
+
+                loadLocalScans();
+                populateClassSelect(data.todayName || '');
+
+                document.getElementById('loginView').style.display = 'none';
+                document.getElementById('scannerApp').style.display = 'block';
+                document.getElementById('topActions').style.display = 'flex';
+                document.getElementById('staffTag').textContent = '👤 ' + STAFF_NAME;
+                document.getElementById('rosterInfo').textContent = STUDENTS.length + ' students synced';
+                document.getElementById('todayDateLbl').textContent = TODAY_DATE;
+                renderLogAndStats();
+            } catch (ex) {
+                err.textContent = 'Connection error: ' + ex.message;
+                err.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '🔓 Unlock QR Scanner →';
+            }
+        }
+
+        async function refreshRoster() {
+            const info = document.getElementById('rosterInfo');
+            info.textContent = 'Refreshing...';
+            try {
+                const res = await fetch('/api/staff/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-STAFF-PIN': STAFF_PIN },
+                    body: JSON.stringify({ pin: STAFF_PIN, staffName: STAFF_NAME })
+                });
+                const data = await res.json();
+                if (data.status === 'OK') {
+                    CLASSES = data.classes || [];
+                    STUDENTS = data.students || [];
+                    const prev = document.getElementById('classSelect').value;
+                    populateClassSelect(data.todayName || '');
+                    if (prev) document.getElementById('classSelect').value = prev;
+                    info.textContent = STUDENTS.length + ' students ✓';
+                }
+            } catch (e) {
+                info.textContent = 'Offline mode';
+            }
+        }
+
+        function logoutStaff() {
+            stopCamera();
+            sessionStorage.removeItem('sage_staff_pin');
+            STAFF_PIN = '';
+            document.getElementById('scannerApp').style.display = 'none';
+            document.getElementById('topActions').style.display = 'none';
+            document.getElementById('loginView').style.display = 'block';
+            document.getElementById('loginBtn').disabled = false;
+            document.getElementById('loginBtn').textContent = '🔓 Unlock QR Scanner →';
+            document.getElementById('staffPinInput').value = '';
+        }
+
+        function populateClassSelect(todayName) {
+            const sel = document.getElementById('classSelect');
+            const tUp = String(todayName || '').toUpperCase();
+            const sorted = [...CLASSES].sort((a, b) => {
+                const aT = String(a.dayOfWeek || '').toUpperCase() === tUp ? 0 : 1;
+                const bT = String(b.dayOfWeek || '').toUpperCase() === tUp ? 0 : 1;
+                if (aT !== bT) return aT - bT;
+                return String(a.name || '').localeCompare(String(b.name || ''));
+            });
+            let html = '<option value="">🚪 General Gate Attendance (All Classes)</option>';
+            sorted.forEach(c => {
+                const isToday = tUp && String(c.dayOfWeek || '').toUpperCase() === tUp;
+                const tag = isToday ? '★ TODAY • ' : (c.dayOfWeek ? c.dayOfWeek.slice(0,3) + ' • ' : '');
+                const time = c.startTime ? ' (' + c.startTime + ')' : '';
+                html += '<option value="' + escHtml(c.id) + '">' + escHtml(tag + c.name + (c.grade ? ' - ' + c.grade : '') + time) + '</option>';
+            });
+            sel.innerHTML = html;
+            const savedClass = localStorage.getItem('sage_staff_last_class');
+            if (savedClass && [...sel.options].some(o => o.value === savedClass)) {
+                sel.value = savedClass;
+            }
+        }
+
+        function onClassChanged() {
+            localStorage.setItem('sage_staff_last_class', document.getElementById('classSelect').value);
+            document.getElementById('resultBox').style.display = 'none';
+        }
+
+        function getStorageKey() {
+            return 'sage_staff_scans_' + (TODAY_DATE || new Date().toISOString().slice(0, 10));
+        }
+
+        function loadLocalScans() {
+            try {
+                SCANS = JSON.parse(localStorage.getItem(getStorageKey()) || '[]');
+                if (!Array.isArray(SCANS)) SCANS = [];
+            } catch (e) { SCANS = []; }
+        }
+
+        function saveLocalScans() {
+            try { localStorage.setItem(getStorageKey(), JSON.stringify(SCANS)); } catch (e) {}
+        }
+
+        async function toggleCamera() {
+            if (cameraRunning) { await stopCamera(); } else { await startCamera(); }
+        }
+
+        async function startCamera() {
+            if (typeof Html5Qrcode === 'undefined') {
+                showSimpleBanner('res-warn', '⚠️ Camera Library Offline', 'Use the Manual Student ID box below, or reconnect internet and reload.');
+                return;
+            }
+            const btn = document.getElementById('camToggleBtn');
+            btn.textContent = 'Starting...';
+            try {
+                document.getElementById('camPlaceholder').style.display = 'none';
+                if (!html5Qr) html5Qr = new Html5Qrcode('reader');
+                await html5Qr.start(
+                    { facingMode: facingMode },
+                    { fps: 12, qrbox: { width: 220, height: 220 }, aspectRatio: 1.0 },
+                    (decodedText) => onQrDecoded(decodedText),
+                    () => {}
+                );
+                cameraRunning = true;
+                btn.className = 'btn-cam stop';
+                btn.textContent = '⏹ Stop Camera';
+            } catch (err) {
+                document.getElementById('camPlaceholder').style.display = 'block';
+                btn.className = 'btn-cam active';
+                btn.textContent = '▶ Start Camera';
+                showSimpleBanner('res-warn', '📷 Camera Permission Needed', String(err) + ' — Allow camera permission in browser settings, or use Manual ID entry.');
+            }
+        }
+
+        async function stopCamera() {
+            const btn = document.getElementById('camToggleBtn');
+            if (html5Qr && cameraRunning) {
+                try { await html5Qr.stop(); } catch (e) {}
+            }
+            cameraRunning = false;
+            document.getElementById('camPlaceholder').style.display = 'block';
+            btn.className = 'btn-cam active';
+            btn.textContent = '▶ Start Camera';
+        }
+
+        async function flipCamera() {
+            facingMode = (facingMode === 'environment') ? 'user' : 'environment';
+            if (cameraRunning) {
+                await stopCamera();
+                await startCamera();
+            }
+        }
+
+        async function scanFromFile(e) {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            e.target.value = '';
+            if (typeof Html5Qrcode === 'undefined') return;
+            const wasRunning = cameraRunning;
+            if (wasRunning) await stopCamera();
+            try {
+                if (!html5Qr) html5Qr = new Html5Qrcode('reader');
+                const decoded = await html5Qr.scanFile(file, false);
+                processToken(decoded, false);
+            } catch (err) {
+                playBeep('error');
+                showSimpleBanner('res-unpaid', '❌ No QR Code Found in Photo', 'Please select a clearer photo of the Student QR ID.');
+            }
+            if (wasRunning) await startCamera();
+        }
+
+        function onQrDecoded(text) {
+            const now = Date.now();
+            const clean = String(text || '').trim();
+            if (!clean) return;
+            if (clean === lastQrCode && (now - lastQrAt) < 3500) return;
+            lastQrCode = clean;
+            lastQrAt = now;
+            processToken(clean, false);
+        }
+
+        function manualMark() {
+            const inp = document.getElementById('manualCodeInput');
+            const val = inp.value.trim();
+            if (!val) return;
+            inp.value = '';
+            processToken(val, false);
+        }
+
+        function findStudent(token) {
+            const raw = String(token || '').trim();
+            const upper = raw.toUpperCase();
+            const norm = normalizeCode(raw);
+            return STUDENTS.find(s => {
+                if (s.qrToken && String(s.qrToken).trim().toUpperCase() === upper) return true;
+                if (s.studentCode && String(s.studentCode).trim().toUpperCase() === upper) return true;
+                if (s.regNumber && String(s.regNumber).trim().toUpperCase() === upper) return true;
+                if (norm && normalizeCode(s.studentCode) === norm) return true;
+                if (norm && normalizeCode(s.regNumber) === norm) return true;
+                if (norm && String(s.id) === norm) return true;
+                return false;
+            });
+        }
+
+        function processToken(token, forceNotEnrolled) {
+            const stu = findStudent(token);
+            if (!stu) {
+                playBeep('error');
+                showSimpleBanner('res-unpaid', '❌ STUDENT NOT FOUND (හමු නොවීය)', 'Scanned Code: ' + token + ' — Sync latest students from SAGE-SMS Desktop if newly registered.');
+                return;
+            }
+
+            const selEl = document.getElementById('classSelect');
+            const classId = selEl.value ? Number(selEl.value) : null;
+            const classObj = classId ? CLASSES.find(c => Number(c.id) === classId) : null;
+            const className = classObj ? classObj.name : 'General Gate Attendance';
+
+            // Duplicate check for today + class
+            const dup = SCANS.find(x => String(x.studentCode) === String(stu.studentCode) && String(x.classId || '') === String(classId || ''));
+            if (dup) {
+                playBeep('warn');
+                const feeTxt = dup.feeStatus === 'PAID' ? '✅ FEE PAID' : (dup.feeStatus === 'NOT_PAID' ? '❌ FEE UNPAID' : 'General Gate');
+                showResultCard('res-warn', '⚠️ ALREADY MARKED TODAY (දැනටමත් ලකුණු කර ඇත)', stu, className, feeTxt + ' • Scanned at ' + dup.timeStr, null);
+                return;
+            }
+
+            const enrolled = Array.isArray(stu.enrolledClasses) ? stu.enrolledClasses : [];
+            let feeStatus = 'GENERAL';
+            let feeDetail = '';
+            let cardClass = 'res-paid';
+            let statusBanner = '✅ PRESENT • GATE CHECK-IN OK';
+
+            if (classId) {
+                const matchEnr = enrolled.find(ec => Number(ec.id) === classId);
+                if (!matchEnr && !forceNotEnrolled) {
+                    playBeep('warn');
+                    showResultCard(
+                        'res-notenr',
+                        '⚠️ NOT ENROLLED IN THIS CLASS (පන්තියට ලියාපදිංචි නැත)',
+                        stu,
+                        className,
+                        'Enrolled in: ' + (enrolled.length ? enrolled.map(e => e.className).join(', ') : 'None'),
+                        token
+                    );
+                    return;
+                }
+                if (matchEnr) {
+                    if (matchEnr.paidThisMonth) {
+                        feeStatus = 'PAID';
+                        feeDetail = '✅ PAID (' + CURRENT_MONTH + ')' + (matchEnr.paidReceiptNo ? ' • ' + matchEnr.paidReceiptNo : '');
+                        cardClass = 'res-paid';
+                        statusBanner = '✅ PRESENT • FEE PAID (ගෙවා ඇත)';
+                        playBeep('paid');
+                    } else {
+                        feeStatus = 'NOT_PAID';
+                        feeDetail = '❌ UNPAID FOR ' + CURRENT_MONTH + ' • Fee: LKR ' + Number(matchEnr.fee || 0).toLocaleString();
+                        cardClass = 'res-unpaid';
+                        statusBanner = '⚠️ PRESENT • FEE UNPAID (ගෙවා නැත!)';
+                        playBeep('unpaid');
+                    }
+                } else {
+                    // Marked anyway despite not enrolled
+                    feeStatus = 'NOT_PAID';
+                    feeDetail = 'Marked present as walk-in (Not enrolled yet)';
+                    cardClass = 'res-warn';
+                    statusBanner = '✔ PRESENT (WALK-IN MARKED)';
+                    playBeep('paid');
+                }
+            } else {
+                // General gate attendance
+                const unpaidCnt = enrolled.filter(e => !e.paidThisMonth).length;
+                if (enrolled.length > 0 && unpaidCnt === 0) {
+                    feeStatus = 'PAID';
+                    feeDetail = '✅ All ' + enrolled.length + ' classes paid for ' + CURRENT_MONTH;
+                    cardClass = 'res-paid';
+                    statusBanner = '✅ PRESENT • ALL FEES PAID';
+                    playBeep('paid');
+                } else if (unpaidCnt > 0) {
+                    feeStatus = 'NOT_PAID';
+                    feeDetail = '❌ ' + unpaidCnt + ' of ' + enrolled.length + ' class(es) unpaid for ' + CURRENT_MONTH;
+                    cardClass = 'res-unpaid';
+                    statusBanner = '⚠️ PRESENT • ' + unpaidCnt + ' UNPAID CLASS(ES)';
+                    playBeep('unpaid');
+                } else {
+                    feeStatus = 'GENERAL';
+                    feeDetail = 'General gate attendance recorded';
+                    cardClass = 'res-paid';
+                    statusBanner = '✅ PRESENT • GATE CHECK-IN';
+                    playBeep('paid');
+                }
+            }
+
+            const now = new Date();
+            const timeStr = now.toTimeString().slice(0, 8);
+            const scanObj = {
+                scanId: 'MOB-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
+                studentId: stu.id,
+                studentCode: stu.studentCode,
+                studentName: stu.fullName,
+                grade: stu.grade || '',
+                classId: classId,
+                className: className,
+                date: TODAY_DATE,
+                timeStr: timeStr,
+                scannedAt: now.toISOString(),
+                staffName: STAFF_NAME,
+                feeStatus: feeStatus,
+                uploaded: false
+            };
+
+            SCANS.unshift(scanObj);
+            saveLocalScans();
+            showResultCard(cardClass, statusBanner, stu, className, feeDetail, null);
+            renderLogAndStats();
+            uploadScans([scanObj]);
+        }
+
+        function showSimpleBanner(cls, title, msg) {
+            const box = document.getElementById('resultBox');
+            box.className = cls;
+            box.style.display = 'block';
+            box.innerHTML = '<div class="res-status"><span>' + escHtml(title) + '</span></div>' +
+                            '<div class="res-meta">' + escHtml(msg) + '</div>';
+        }
+
+        function showResultCard(cls, banner, stu, className, detail, forceToken) {
+            const box = document.getElementById('resultBox');
+            box.className = cls;
+            box.style.display = 'block';
+            let html = '<div class="res-status"><span>' + escHtml(banner) + '</span><span>' + escHtml(stu.studentCode) + '</span></div>' +
+                       '<div class="res-name">' + escHtml(stu.fullName) + '</div>' +
+                       '<div class="res-meta">' + escHtml(stu.grade || '-') + ' &bull; ' + escHtml(className) + '<br><b>' + escHtml(detail) + '</b></div>';
+            if (forceToken) {
+                html += '<button class="btn-force" onclick="processToken(' + escHtml(JSON.stringify(forceToken)) + ', true)">✔ Mark Attendance Anyway</button>';
+            }
+            box.innerHTML = html;
+        }
+
+        async function uploadScans(items) {
+            if (!items || !items.length) return;
+            const txt = document.getElementById('syncStatusTxt');
+            txt.textContent = '☁️ Uploading ' + items.length + ' scan(s) to Cloud...';
+            try {
+                const res = await fetch('/api/staff/attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-STAFF-PIN': STAFF_PIN },
+                    body: JSON.stringify({ pin: STAFF_PIN, scans: items })
+                });
+                const data = await res.json();
+                if (res.status === 200 && data.status === 'OK') {
+                    const ids = new Set(items.map(i => i.scanId));
+                    SCANS.forEach(s => { if (ids.has(s.scanId)) s.uploaded = true; });
+                    saveLocalScans();
+                    renderLogAndStats();
+                    txt.innerHTML = '✅ <b>Cloud Synced!</b> Click <b>Pull Phone Scans</b> on PC anytime.';
+                } else {
+                    txt.textContent = '⚠️ Cloud upload retry needed (' + (data.message || res.status) + ')';
+                }
+            } catch (e) {
+                txt.textContent = '📶 Offline — saved safely on phone. Tap Push All when online.';
+            }
+        }
+
+        async function pushAllToCloud() {
+            if (!SCANS.length) {
+                document.getElementById('syncStatusTxt').textContent = 'ℹ️ No scans today to upload yet.';
+                return;
+            }
+            const btn = document.getElementById('pushAllBtn');
+            btn.disabled = true;
+            btn.textContent = 'Pushing...';
+            await uploadScans(SCANS);
+            btn.disabled = false;
+            btn.textContent = '☁️ Push All';
+        }
+
+        function removeScan(scanId) {
+            SCANS = SCANS.filter(s => s.scanId !== scanId);
+            saveLocalScans();
+            renderLogAndStats();
+        }
+
+        function clearLocalToday() {
+            if (!SCANS.length) return;
+            if (!confirm('Clear today\\'s phone scan log? (Make sure you already synced to Desktop PC!)')) return;
+            SCANS = [];
+            saveLocalScans();
+            renderLogAndStats();
+        }
+
+        function renderLogAndStats() {
+            const total = SCANS.length;
+            const paid = SCANS.filter(s => s.feeStatus === 'PAID').length;
+            const unpaid = SCANS.filter(s => s.feeStatus === 'NOT_PAID').length;
+            const synced = SCANS.filter(s => s.uploaded).length;
+
+            document.getElementById('stTotal').textContent = total;
+            document.getElementById('stPaid').textContent = paid;
+            document.getElementById('stUnpaid').textContent = unpaid;
+            document.getElementById('stSynced').textContent = synced;
+
+            const list = document.getElementById('logList');
+            if (!total) {
+                list.innerHTML = '<div style="text-align:center; color:#64748b; padding:18px; font-size:13px;">No students scanned yet today.</div>';
+                return;
+            }
+            list.innerHTML = SCANS.map(s => {
+                const pill = s.feeStatus === 'PAID'
+                    ? '<span class="pill pill-g">✅ PAID</span>'
+                    : (s.feeStatus === 'NOT_PAID' ? '<span class="pill pill-r">❌ UNPAID</span>' : '<span class="pill pill-b">GATE</span>');
+                const cloudMark = s.uploaded ? '☁️' : '⏳';
+                return '<div class="log-item">' +
+                    '<div class="log-left">' +
+                        '<div class="log-name">' + escHtml(s.studentName) + ' <span style="color:#94a3b8; font-weight:600; font-size:11.5px;">(' + escHtml(s.studentCode) + ')</span></div>' +
+                        '<div class="log-sub">' + escHtml(s.className) + ' &bull; ' + escHtml(s.timeStr) + ' &bull; ' + cloudMark + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex; align-items:center; gap:5px;">' + pill +
+                        '<button class="btn-del" onclick="removeScan(' + escHtml(JSON.stringify(s.scanId)) + ')" title="Remove from phone log">✕</button>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+        }
+    </script>
+</body>
+</html>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 3. HTTP RESPONSE HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
 function sendHtml(res, html, status = 200) {
@@ -1026,7 +1781,7 @@ function sendJson(res, data, status = 200) {
     res.writeHead(status, {
         'Content-Type': 'application/json; charset=utf-8',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, X-SAGE-SECRET',
+        'Access-Control-Allow-Headers': 'Content-Type, X-SAGE-SECRET, X-STAFF-PIN',
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
     });
     res.end(JSON.stringify(data));
@@ -1040,7 +1795,7 @@ async function handleRequest(req, res) {
     if (req.method === 'OPTIONS') {
         res.writeHead(204, {
             'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'Content-Type, X-SAGE-SECRET',
+            'Access-Control-Allow-Headers': 'Content-Type, X-SAGE-SECRET, X-STAFF-PIN',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
         });
         res.end();
@@ -1057,9 +1812,129 @@ async function handleRequest(req, res) {
             return sendHtml(res, renderRegistrationPage());
         }
 
+        // 1B. GET /staff-scan (Staff Mobile QR Attendance Scanner)
+        if (req.method === 'GET' && (pathname === '/staff-scan' || pathname === '/staff-scan/')) {
+            return sendHtml(res, renderStaffScannerPage());
+        }
+
         // 2. GET / (Parent Portal)
         if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
             return handleParentPortal(req, res, parsed.searchParams);
+        }
+
+        // 2B. POST /api/staff/login (Verify Staff PIN & return compact roster for instant scanning)
+        if (req.method === 'POST' && pathname === '/api/staff/login') {
+            const body = await getBody(req);
+            if (!isAuthorizedStaff(req, parsed, body)) {
+                return sendJson(res, { status: 'ERROR', message: 'Invalid Staff PIN. Please check PIN in SAGE-SMS Desktop.' }, 401);
+            }
+            const classes = readJson(CLASSES_FILE, []);
+            const studentsRaw = readJson(STUDENTS_FILE, []);
+            const students = studentsRaw.map(s => ({
+                id: s.id,
+                studentCode: s.studentCode,
+                regNumber: s.regNumber,
+                qrToken: s.qrToken || s.studentCode,
+                fullName: s.fullName,
+                grade: s.grade || '',
+                enrolledClasses: Array.isArray(s.enrolledClasses) ? s.enrolledClasses.map(ec => ({
+                    id: ec.id,
+                    className: ec.className,
+                    fee: ec.fee || 0,
+                    paidThisMonth: Boolean(ec.paidThisMonth),
+                    paidReceiptNo: ec.paidReceiptNo || '',
+                    paidDate: ec.paidDate || ''
+                })) : []
+            }));
+            const slNow = getSlNow();
+            const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+            return sendJson(res, {
+                status: 'OK',
+                todayDate: slNow.toISOString().slice(0, 10),
+                currentMonth: slNow.toISOString().slice(0, 7),
+                todayName: dayNames[slNow.getUTCDay()],
+                classes,
+                students
+            });
+        }
+
+        // 2C. POST /api/staff/attendance (Upload single or batch mobile scans)
+        if (req.method === 'POST' && pathname === '/api/staff/attendance') {
+            const body = await getBody(req);
+            if (!isAuthorizedStaff(req, parsed, body)) {
+                return sendJson(res, { status: 'ERROR', message: 'Unauthorized Staff PIN' }, 401);
+            }
+            const incoming = Array.isArray(body.scans) ? body.scans : (body.studentCode ? [body] : []);
+            const existing = readJson(ATTENDANCE_FILE, []);
+            const byKey = new Map();
+            existing.forEach(item => {
+                const k = `${item.studentCode}|${item.classId || ''}|${item.date}`;
+                byKey.set(k, item);
+            });
+
+            let savedCount = 0;
+            incoming.forEach(sc => {
+                if (!sc || !sc.studentCode) return;
+                const d = sc.date || getSlDateStr();
+                const cid = (sc.classId !== null && sc.classId !== undefined && sc.classId !== '') ? Number(sc.classId) : null;
+                const k = `${sc.studentCode}|${cid || ''}|${d}`;
+                const prev = byKey.get(k);
+                if (!prev) {
+                    byKey.set(k, {
+                        scanId: sc.scanId || ('MOB-' + Date.now() + '-' + Math.floor(Math.random() * 10000)),
+                        studentId: sc.studentId || 0,
+                        studentCode: String(sc.studentCode).trim(),
+                        studentName: String(sc.studentName || '').trim(),
+                        classId: cid,
+                        className: String(sc.className || 'General Gate Attendance').trim(),
+                        date: d,
+                        timeStr: String(sc.timeStr || getSlNow().toISOString().slice(11, 19)),
+                        staffName: String(sc.staffName || 'MobileStaff').trim(),
+                        feeStatus: String(sc.feeStatus || 'GENERAL').trim(),
+                        syncedToDesktop: false,
+                        receivedAt: new Date().toISOString()
+                    });
+                    savedCount++;
+                }
+            });
+
+            // Keep last 5,000 records max
+            const allList = Array.from(byKey.values()).slice(-5000);
+            writeJson(ATTENDANCE_FILE, allList);
+            const pendingCount = allList.filter(x => !x.syncedToDesktop).length;
+            return sendJson(res, { status: 'OK', savedCount, totalPending: pendingCount });
+        }
+
+        // 2D. GET /api/staff/attendance (Desktop SAGE-SMS pulls pending mobile scans)
+        if (req.method === 'GET' && pathname === '/api/staff/attendance') {
+            const key = req.headers['x-sage-secret'] || parsed.searchParams.get('key');
+            if (key !== API_SECRET) {
+                return sendJson(res, { status: 'ERROR', message: 'Unauthorized' }, 401);
+            }
+            const onlyPending = parsed.searchParams.get('pending') !== 'false';
+            const all = readJson(ATTENDANCE_FILE, []);
+            const scans = onlyPending ? all.filter(x => !x.syncedToDesktop) : all;
+            return sendJson(res, { status: 'OK', scans });
+        }
+
+        // 2E. POST /api/staff/attendance/ack (Desktop acknowledges imported scanIds)
+        if (req.method === 'POST' && pathname === '/api/staff/attendance/ack') {
+            const key = req.headers['x-sage-secret'] || parsed.searchParams.get('key');
+            if (key !== API_SECRET) {
+                return sendJson(res, { status: 'ERROR', message: 'Unauthorized' }, 401);
+            }
+            const body = await getBody(req);
+            const ackIds = new Set(Array.isArray(body.scanIds) ? body.scanIds.map(String) : []);
+            const all = readJson(ATTENDANCE_FILE, []);
+            let acked = 0;
+            all.forEach(item => {
+                if (ackIds.has(String(item.scanId))) {
+                    item.syncedToDesktop = true;
+                    acked++;
+                }
+            });
+            writeJson(ATTENDANCE_FILE, all);
+            return sendJson(res, { status: 'OK', acked });
         }
 
         // 3. POST /api/register (Online admission submission from phone)
@@ -1145,7 +2020,7 @@ async function handleRequest(req, res) {
             return sendJson(res, { status: 'ERROR', message: 'Admission not found' }, 404);
         }
 
-        // 6. POST /api/sync-data (SAGE-SMS Desktop uploads active classes & students for 24/7 Parent Portal)
+        // 6. POST /api/sync-data (SAGE-SMS Desktop uploads active classes, students & staffPin for 24/7 Cloud Portal)
         if (req.method === 'POST' && pathname === '/api/sync-data') {
             const key = req.headers['x-sage-secret'] || parsed.searchParams.get('key');
             if (key !== API_SECRET) {
@@ -1153,12 +2028,18 @@ async function handleRequest(req, res) {
             }
 
             const body = await getBody(req);
-            const { classes, students } = body;
+            const { classes, students, staffPin } = body;
             if (Array.isArray(classes)) {
                 writeJson(CLASSES_FILE, classes);
             }
             if (Array.isArray(students)) {
                 writeJson(STUDENTS_FILE, students);
+            }
+            if (staffPin && String(staffPin).trim()) {
+                const cfg = readJson(CONFIG_FILE, {});
+                cfg.staffPin = String(staffPin).trim();
+                cfg.updatedAt = new Date().toISOString();
+                writeJson(CONFIG_FILE, cfg);
             }
 
             return sendJson(res, {
@@ -1184,6 +2065,7 @@ if (require.main === module) {
         console.log(` SAGE SMS 24/7 Cloud Portal running on port ${PORT}`);
         console.log(` - Online Registration: http://localhost:${PORT}/register`);
         console.log(` - Parent Portal:       http://localhost:${PORT}/`);
+        console.log(` - Staff QR Scanner:    http://localhost:${PORT}/staff-scan`);
         console.log(`=======================================================`);
     });
 }
