@@ -1105,16 +1105,37 @@ function renderStaffScannerPage() {
         #resultBox { display: none; border-radius: 16px; padding: 16px; margin-bottom: 12px; border: 2px solid transparent; animation: pop 0.18s ease-out; }
         @keyframes pop { from { transform: scale(0.96); opacity: 0.6; } to { transform: scale(1); opacity: 1; } }
         .res-paid { background: linear-gradient(135deg, #064e3b, #065f46); border-color: #34d399 !important; }
+        .res-dayfee { background: linear-gradient(135deg, #0c4a6e, #0369a1); border-color: #38bdf8 !important; }
+        .res-freecard { background: linear-gradient(135deg, #312e81, #4338ca); border-color: #818cf8 !important; }
         .res-unpaid { background: linear-gradient(135deg, #7f1d1d, #991b1b); border-color: #f87171 !important; }
         .res-warn { background: linear-gradient(135deg, #78350f, #92400e); border-color: #fbbf24 !important; }
         .res-notenr { background: linear-gradient(135deg, #4c1d95, #5b21b6); border-color: #a78bfa !important; }
-        .res-status { font-size: 13px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .res-status { font-size: 13px; font-weight: 900; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
         .res-name { font-size: 20px; font-weight: 900; color: #fff; margin-bottom: 3px; }
-        .res-meta { font-size: 13px; color: rgba(255,255,255,0.88); line-height: 1.5; }
+        .res-meta { font-size: 13px; color: rgba(255,255,255,0.9); line-height: 1.5; }
         .btn-force { margin-top: 10px; width: 100%; padding: 10px; background: #fde68a; color: #78350f; border: none; border-radius: 10px; font-weight: 800; font-size: 13.5px; cursor: pointer; }
 
+        /* Gate Fee Action Buttons on Scan Banner */
+        .fee-mode-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #334155; flex-wrap: wrap; }
+        .fee-mode-toggle { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; color: #e2e8f0; cursor: pointer; }
+        .fee-mode-toggle input { width: 17px; height: 17px; accent-color: #0ea5e9; }
+        .dayfee-box { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: #94a3b8; }
+        .dayfee-box input { width: 76px; padding: 6px 8px; background: #0f172a; border: 1.5px solid #475569; border-radius: 8px; color: #38bdf8; font-weight: 800; font-size: 13px; text-align: center; outline: none; }
+        .fee-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 11px; }
+        .btn-fa { padding: 10px 8px; border: 1.5px solid rgba(255,255,255,0.28); border-radius: 10px; font-size: 12.5px; font-weight: 800; cursor: pointer; color: #fff; text-align: center; }
+        .btn-fa-monthly { background: #16a34a; border-color: #4ade80; }
+        .btn-fa-day { background: #0284c7; border-color: #38bdf8; }
+        .btn-fa-free { background: #4f46e5; border-color: #818cf8; }
+        .btn-fa-unpaid { background: rgba(15,23,42,0.55); border-color: #fca5a5; color: #fecaca; }
+        .btn-fa.selected { box-shadow: 0 0 0 2.5px #fde047; }
+
+        /* Live Cash in Hand Banner */
+        .cash-bar { background: linear-gradient(135deg, #064e3b, #0f172a); border: 1.5px solid #10b981; border-radius: 14px; padding: 11px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .cash-left { font-size: 11.5px; color: #a7f3d0; font-weight: 700; line-height: 1.4; }
+        .cash-amt { font-size: 20px; font-weight: 900; color: #4ade80; white-space: nowrap; }
+
         /* Stats Strip */
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
         .stat { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 10px 6px; text-align: center; }
         .stat .num { font-size: 20px; font-weight: 900; }
         .stat .lbl { font-size: 10px; color: #94a3b8; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
@@ -1126,15 +1147,18 @@ function renderStaffScannerPage() {
         .btn-sync:disabled { opacity: 0.5; }
 
         /* Scan Log */
-        .log-list { max-height: 310px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; }
+        .log-list { max-height: 330px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; }
         .log-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 9px 11px; }
         .log-left { min-width: 0; }
         .log-name { font-size: 13.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .log-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
         .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
         .pill-g { background: #14532d; color: #86efac; }
+        .pill-c { background: #0c4a6e; color: #7dd3fc; }
+        .pill-p { background: #312e81; color: #c7d2fe; }
         .pill-r { background: #7f1d1d; color: #fca5a5; }
         .pill-b { background: #1e3a8a; color: #93c5fd; }
+        .btn-edit-fee { background: #1e293b; border: 1px solid #475569; color: #fde68a; font-size: 11px; font-weight: 800; border-radius: 7px; padding: 4px 7px; cursor: pointer; }
         .btn-del { background: transparent; border: none; color: #64748b; font-size: 15px; cursor: pointer; padding: 4px 6px; }
     </style>
 </head>
@@ -1176,13 +1200,23 @@ function renderStaffScannerPage() {
 
         <!-- 2. LIVE STAFF QR SCANNER WORKSPACE -->
         <div id="scannerApp">
-            <!-- Class Selector -->
+            <!-- Class Selector & Gate Fee Mode -->
             <div class="card">
                 <div class="card-label">
                     <span>📚 Select Active Class (පන්තිය තෝරන්න)</span>
                     <span id="rosterInfo" style="color:#38bdf8;">0 students</span>
                 </div>
                 <select id="classSelect" class="class-select" onchange="onClassChanged()"></select>
+                <div class="fee-mode-bar">
+                    <label class="fee-mode-toggle">
+                        <input type="checkbox" id="autoDayFeeCheck" onchange="saveFeePrefs()">
+                        <span>💵 Auto Day Fee on Unpaid Scan</span>
+                    </label>
+                    <div class="dayfee-box">
+                        <span>Day Fee LKR</span>
+                        <input type="number" id="dayFeeAmountInput" value="200" min="0" step="50" onchange="saveFeePrefs()">
+                    </div>
+                </div>
             </div>
 
             <!-- Instant Result Alert -->
@@ -1218,9 +1252,18 @@ function renderStaffScannerPage() {
             <!-- Live Stats -->
             <div class="stats-grid">
                 <div class="stat"><div class="num" id="stTotal" style="color:#f8fafc;">0</div><div class="lbl">Scanned</div></div>
-                <div class="stat"><div class="num" id="stPaid" style="color:#4ade80;">0</div><div class="lbl">Paid</div></div>
-                <div class="stat"><div class="num" id="stUnpaid" style="color:#f87171;">0</div><div class="lbl">Unpaid</div></div>
-                <div class="stat"><div class="num" id="stSynced" style="color:#38bdf8;">0</div><div class="lbl">Cloud OK</div></div>
+                <div class="stat"><div class="num" id="stPaid" style="color:#4ade80;">0</div><div class="lbl">Paid / Mon</div></div>
+                <div class="stat"><div class="num" id="stDayFee" style="color:#38bdf8;">0</div><div class="lbl">Day Fee</div></div>
+                <div class="stat"><div class="num" id="stUnpaid" style="color:#f87171;">0</div><div class="lbl">Not Paid</div></div>
+            </div>
+
+            <!-- Live Staff Cash in Hand -->
+            <div class="cash-bar">
+                <div class="cash-left">
+                    <div>💰 CASH IN HAND TODAY (අතේ එකතු වූ මුදල)</div>
+                    <div id="cashBreakdown" style="font-weight:600; color:#cbd5e1;">Monthly: 0 • Day Fee: 0 • Free Card: 0 • Cloud: 0/0</div>
+                </div>
+                <div class="cash-amt" id="stCashTotal">LKR 0</div>
             </div>
 
             <!-- Cloud Push Bar -->
@@ -1257,16 +1300,35 @@ function renderStaffScannerPage() {
         let lastQrCode = '';
         let lastQrAt = 0;
 
-        // Restore staff name & active session on load
+        // Restore staff name, fee preferences & active session on load
         window.addEventListener('DOMContentLoaded', () => {
             const savedName = localStorage.getItem('sage_staff_name') || '';
             if (savedName) document.getElementById('staffNameInput').value = savedName;
+            const savedDayFee = localStorage.getItem('sage_staff_day_fee');
+            if (savedDayFee) document.getElementById('dayFeeAmountInput').value = savedDayFee;
+            document.getElementById('autoDayFeeCheck').checked = localStorage.getItem('sage_staff_auto_dayfee') === '1';
+
             const savedPin = sessionStorage.getItem('sage_staff_pin') || '';
             if (savedName && savedPin) {
                 document.getElementById('staffPinInput').value = savedPin;
                 doLogin(savedName, savedPin, true);
             }
         });
+
+        function saveFeePrefs() {
+            const amt = Math.max(0, Number(document.getElementById('dayFeeAmountInput').value || 200));
+            localStorage.setItem('sage_staff_day_fee', String(amt));
+            localStorage.setItem('sage_staff_auto_dayfee', document.getElementById('autoDayFeeCheck').checked ? '1' : '0');
+        }
+
+        function getDayFeeAmount() {
+            const v = Number(document.getElementById('dayFeeAmountInput').value);
+            return (!isNaN(v) && v > 0) ? v : 200;
+        }
+
+        function isAutoDayFee() {
+            return Boolean(document.getElementById('autoDayFeeCheck').checked);
+        }
 
         function normalizeCode(c) {
             if (!c) return '';
@@ -1555,57 +1617,75 @@ function renderStaffScannerPage() {
             const classId = selEl.value ? Number(selEl.value) : null;
             const classObj = classId ? CLASSES.find(c => Number(c.id) === classId) : null;
             const className = classObj ? classObj.name : 'General Gate Attendance';
+            const defaultClassFee = classObj ? Number(classObj.fee || 0) : 0;
 
-            // Duplicate check for today + class
+            // Duplicate check for today + class -> show existing card with fee-edit option if not already pre-paid!
             const dup = SCANS.find(x => String(x.studentCode) === String(stu.studentCode) && String(x.classId || '') === String(classId || ''));
             if (dup) {
                 playBeep('warn');
-                const feeTxt = dup.feeStatus === 'PAID' ? '✅ FEE PAID' : (dup.feeStatus === 'NOT_PAID' ? '❌ FEE UNPAID' : 'General Gate');
-                showResultCard('res-warn', '⚠️ ALREADY MARKED TODAY (දැනටමත් ලකුණු කර ඇත)', stu, className, feeTxt + ' • Scanned at ' + dup.timeStr, null);
+                const feeTxt = formatFeeSummary(dup);
+                const allowEdit = dup.feeStatus !== 'PAID';
+                showScanCard('res-warn', '⚠️ ALREADY MARKED TODAY (දැනටමත් ලකුණු කර ඇත)', stu, className, feeTxt + ' • Scanned at ' + dup.timeStr, null, allowEdit ? dup : null);
                 return;
             }
 
             const enrolled = Array.isArray(stu.enrolledClasses) ? stu.enrolledClasses : [];
             let feeStatus = 'GENERAL';
+            let paymentType = 'NONE';
+            let collectedAmount = 0;
+            let classFee = defaultClassFee;
             let feeDetail = '';
             let cardClass = 'res-paid';
             let statusBanner = '✅ PRESENT • GATE CHECK-IN OK';
+            let showFeeButtons = false;
 
             if (classId) {
                 const matchEnr = enrolled.find(ec => Number(ec.id) === classId);
                 if (!matchEnr && !forceNotEnrolled) {
                     playBeep('warn');
-                    showResultCard(
+                    showScanCard(
                         'res-notenr',
                         '⚠️ NOT ENROLLED IN THIS CLASS (පන්තියට ලියාපදිංචි නැත)',
                         stu,
                         className,
                         'Enrolled in: ' + (enrolled.length ? enrolled.map(e => e.className).join(', ') : 'None'),
-                        token
+                        token,
+                        null
                     );
                     return;
                 }
-                if (matchEnr) {
-                    if (matchEnr.paidThisMonth) {
-                        feeStatus = 'PAID';
-                        feeDetail = '✅ PAID (' + CURRENT_MONTH + ')' + (matchEnr.paidReceiptNo ? ' • ' + matchEnr.paidReceiptNo : '');
-                        cardClass = 'res-paid';
-                        statusBanner = '✅ PRESENT • FEE PAID (ගෙවා ඇත)';
+                if (matchEnr && Number(matchEnr.fee || 0) > 0) {
+                    classFee = Number(matchEnr.fee);
+                }
+
+                if (matchEnr && matchEnr.paidThisMonth) {
+                    feeStatus = 'PAID';
+                    paymentType = 'NONE';
+                    collectedAmount = 0;
+                    feeDetail = '✅ ALREADY PAID (' + CURRENT_MONTH + ')' + (matchEnr.paidReceiptNo ? ' • ' + matchEnr.paidReceiptNo : '');
+                    cardClass = 'res-paid';
+                    statusBanner = '✅ PRESENT • FEE PAID (ගෙවා ඇත)';
+                    playBeep('paid');
+                } else {
+                    showFeeButtons = true;
+                    if (isAutoDayFee()) {
+                        const dAmt = getDayFeeAmount();
+                        feeStatus = 'DAY_FEE';
+                        paymentType = 'DAY_FEE';
+                        collectedAmount = dAmt;
+                        feeDetail = '💵 DAY FEE COLLECTED: LKR ' + dAmt.toLocaleString() + (matchEnr ? '' : ' (Walk-in)');
+                        cardClass = 'res-dayfee';
+                        statusBanner = '💵 PRESENT • DAY FEE PAID (දින ගාස්තුව)';
                         playBeep('paid');
                     } else {
                         feeStatus = 'NOT_PAID';
-                        feeDetail = '❌ UNPAID FOR ' + CURRENT_MONTH + ' • Fee: LKR ' + Number(matchEnr.fee || 0).toLocaleString();
+                        paymentType = 'NONE';
+                        collectedAmount = 0;
+                        feeDetail = '❌ UNPAID FOR ' + CURRENT_MONTH + (classFee > 0 ? ' • Monthly Fee: LKR ' + classFee.toLocaleString() : '') + ' — Tap below if paying now:';
                         cardClass = 'res-unpaid';
                         statusBanner = '⚠️ PRESENT • FEE UNPAID (ගෙවා නැත!)';
                         playBeep('unpaid');
                     }
-                } else {
-                    // Marked anyway despite not enrolled
-                    feeStatus = 'NOT_PAID';
-                    feeDetail = 'Marked present as walk-in (Not enrolled yet)';
-                    cardClass = 'res-warn';
-                    statusBanner = '✔ PRESENT (WALK-IN MARKED)';
-                    playBeep('paid');
                 }
             } else {
                 // General gate attendance
@@ -1618,7 +1698,7 @@ function renderStaffScannerPage() {
                     playBeep('paid');
                 } else if (unpaidCnt > 0) {
                     feeStatus = 'NOT_PAID';
-                    feeDetail = '❌ ' + unpaidCnt + ' of ' + enrolled.length + ' class(es) unpaid for ' + CURRENT_MONTH;
+                    feeDetail = '❌ ' + unpaidCnt + ' of ' + enrolled.length + ' class(es) unpaid for ' + CURRENT_MONTH + ' (Select a specific class above to collect Day/Monthly fee)';
                     cardClass = 'res-unpaid';
                     statusBanner = '⚠️ PRESENT • ' + unpaidCnt + ' UNPAID CLASS(ES)';
                     playBeep('unpaid');
@@ -1641,19 +1721,100 @@ function renderStaffScannerPage() {
                 grade: stu.grade || '',
                 classId: classId,
                 className: className,
+                classFee: classFee,
                 date: TODAY_DATE,
                 timeStr: timeStr,
                 scannedAt: now.toISOString(),
                 staffName: STAFF_NAME,
                 feeStatus: feeStatus,
+                paymentType: paymentType,
+                collectedAmount: collectedAmount,
                 uploaded: false
             };
 
             SCANS.unshift(scanObj);
             saveLocalScans();
-            showResultCard(cardClass, statusBanner, stu, className, feeDetail, null);
+            showScanCard(cardClass, statusBanner, stu, className, feeDetail, null, showFeeButtons ? scanObj : null);
             renderLogAndStats();
             uploadScans([scanObj]);
+        }
+
+        function formatFeeSummary(sc) {
+            if (sc.feeStatus === 'PAID') return '✅ ALREADY PAID THIS MONTH';
+            if (sc.feeStatus === 'MONTHLY_PAID') return '💰 MONTHLY FEE COLLECTED: LKR ' + Number(sc.collectedAmount || 0).toLocaleString();
+            if (sc.feeStatus === 'DAY_FEE') return '💵 DAY FEE COLLECTED: LKR ' + Number(sc.collectedAmount || 0).toLocaleString();
+            if (sc.feeStatus === 'FREE_CARD') return '🎟️ FREE CARD (නොමිලේ)';
+            if (sc.feeStatus === 'NOT_PAID') return '❌ NOT PAID (නොගෙවූ සිසුන්)';
+            return '🚪 General Gate Attendance';
+        }
+
+        function setScanFeeAction(scanId, actionType) {
+            const sc = SCANS.find(x => x.scanId === scanId);
+            if (!sc) return;
+
+            let cardCls = 'res-unpaid';
+            let banner = '';
+            let detail = '';
+
+            if (actionType === 'MONTHLY_PAID') {
+                let amt = Number(sc.classFee || 0);
+                if (amt <= 0) {
+                    const entered = prompt('Enter Monthly Class Fee collected (LKR) for ' + sc.studentName + ':', '2000');
+                    if (entered === null) return;
+                    amt = Number(String(entered).replace(/[^0-9.]/g, ''));
+                    if (!amt || amt <= 0) return;
+                }
+                sc.feeStatus = 'MONTHLY_PAID';
+                sc.paymentType = 'MONTHLY';
+                sc.collectedAmount = amt;
+                cardCls = 'res-paid';
+                banner = '💰 MONTHLY FEE COLLECTED (මාසික ගාස්තුව)';
+                detail = 'Collected Cash: LKR ' + amt.toLocaleString() + ' • Receipt will auto-create on Desktop Pull!';
+                playBeep('paid');
+            } else if (actionType === 'DAY_FEE') {
+                const dAmt = getDayFeeAmount();
+                sc.feeStatus = 'DAY_FEE';
+                sc.paymentType = 'DAY_FEE';
+                sc.collectedAmount = dAmt;
+                cardCls = 'res-dayfee';
+                banner = '💵 DAY FEE COLLECTED (දින ගාස්තුව)';
+                detail = 'Collected Day Fee Cash: LKR ' + dAmt.toLocaleString() + ' • Syncing to Cloud!';
+                playBeep('paid');
+            } else if (actionType === 'FREE_CARD') {
+                sc.feeStatus = 'FREE_CARD';
+                sc.paymentType = 'NONE';
+                sc.collectedAmount = 0;
+                cardCls = 'res-freecard';
+                banner = '🎟️ FREE CARD MARKED (නොමිලේ)';
+                detail = 'Marked as authorized Free Card (Not counted in Unpaid list)';
+                playBeep('paid');
+            } else {
+                sc.feeStatus = 'NOT_PAID';
+                sc.paymentType = 'NONE';
+                sc.collectedAmount = 0;
+                cardCls = 'res-unpaid';
+                banner = '❌ MARKED NOT PAID (නොගෙවූ සිසුන්)';
+                detail = 'Will appear in Desktop Attendance -> Not Paid Students tab';
+                playBeep('warn');
+            }
+
+            sc.uploaded = false;
+            saveLocalScans();
+            const stuStub = { studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade };
+            showScanCard(cardCls, banner, stuStub, sc.className, detail, null, sc);
+            renderLogAndStats();
+            uploadScans([sc]);
+        }
+
+        function reopenFeeEditor(scanId) {
+            const sc = SCANS.find(x => x.scanId === scanId);
+            if (!sc) return;
+            const stuStub = { studentCode: sc.studentCode, fullName: sc.studentName, grade: sc.grade };
+            const cls = sc.feeStatus === 'MONTHLY_PAID' || sc.feeStatus === 'PAID' ? 'res-paid'
+                : sc.feeStatus === 'DAY_FEE' ? 'res-dayfee'
+                : sc.feeStatus === 'FREE_CARD' ? 'res-freecard' : 'res-unpaid';
+            showScanCard(cls, '✎ UPDATE GATE FEE STATUS', stuStub, sc.className, formatFeeSummary(sc) + ' — Choose action below:', null, sc);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         function showSimpleBanner(cls, title, msg) {
@@ -1664,7 +1825,7 @@ function renderStaffScannerPage() {
                             '<div class="res-meta">' + escHtml(msg) + '</div>';
         }
 
-        function showResultCard(cls, banner, stu, className, detail, forceToken) {
+        function showScanCard(cls, banner, stu, className, detail, forceToken, scanForFeeBtns) {
             const box = document.getElementById('resultBox');
             box.className = cls;
             box.style.display = 'block';
@@ -1673,6 +1834,18 @@ function renderStaffScannerPage() {
                        '<div class="res-meta">' + escHtml(stu.grade || '-') + ' &bull; ' + escHtml(className) + '<br><b>' + escHtml(detail) + '</b></div>';
             if (forceToken) {
                 html += '<button class="btn-force" onclick="processToken(' + escHtml(JSON.stringify(forceToken)) + ', true)">✔ Mark Attendance Anyway</button>';
+            }
+            if (scanForFeeBtns && scanForFeeBtns.classId) {
+                const sidArg = escHtml(JSON.stringify(scanForFeeBtns.scanId));
+                const mLbl = scanForFeeBtns.classFee > 0 ? ('LKR ' + Number(scanForFeeBtns.classFee).toLocaleString()) : 'Monthly';
+                const dLbl = 'LKR ' + getDayFeeAmount().toLocaleString();
+                const fs = scanForFeeBtns.feeStatus;
+                html += '<div class="fee-actions-grid">' +
+                    '<button class="btn-fa btn-fa-monthly ' + (fs === 'MONTHLY_PAID' ? 'selected' : '') + '" onclick="setScanFeeAction(' + sidArg + ', \\'MONTHLY_PAID\\')">💰 Monthly (' + escHtml(mLbl) + ')</button>' +
+                    '<button class="btn-fa btn-fa-day ' + (fs === 'DAY_FEE' ? 'selected' : '') + '" onclick="setScanFeeAction(' + sidArg + ', \\'DAY_FEE\\')">💵 Day Fee (' + escHtml(dLbl) + ')</button>' +
+                    '<button class="btn-fa btn-fa-free ' + (fs === 'FREE_CARD' ? 'selected' : '') + '" onclick="setScanFeeAction(' + sidArg + ', \\'FREE_CARD\\')">🎟️ Free Card</button>' +
+                    '<button class="btn-fa btn-fa-unpaid ' + (fs === 'NOT_PAID' ? 'selected' : '') + '" onclick="setScanFeeAction(' + sidArg + ', \\'NOT_PAID\\')">❌ Not Paid</button>' +
+                '</div>';
             }
             box.innerHTML = html;
         }
@@ -1731,14 +1904,21 @@ function renderStaffScannerPage() {
 
         function renderLogAndStats() {
             const total = SCANS.length;
-            const paid = SCANS.filter(s => s.feeStatus === 'PAID').length;
+            const paidOrMon = SCANS.filter(s => s.feeStatus === 'PAID' || s.feeStatus === 'MONTHLY_PAID').length;
+            const monthlyCollectedCnt = SCANS.filter(s => s.feeStatus === 'MONTHLY_PAID').length;
+            const dayFeeCnt = SCANS.filter(s => s.feeStatus === 'DAY_FEE').length;
+            const freeCnt = SCANS.filter(s => s.feeStatus === 'FREE_CARD').length;
             const unpaid = SCANS.filter(s => s.feeStatus === 'NOT_PAID').length;
             const synced = SCANS.filter(s => s.uploaded).length;
+            const cashTotal = SCANS.reduce((sum, s) => sum + Number(s.collectedAmount || 0), 0);
 
             document.getElementById('stTotal').textContent = total;
-            document.getElementById('stPaid').textContent = paid;
+            document.getElementById('stPaid').textContent = paidOrMon;
+            document.getElementById('stDayFee').textContent = dayFeeCnt;
             document.getElementById('stUnpaid').textContent = unpaid;
-            document.getElementById('stSynced').textContent = synced;
+            document.getElementById('stCashTotal').textContent = 'LKR ' + cashTotal.toLocaleString();
+            document.getElementById('cashBreakdown').textContent =
+                'Monthly: ' + monthlyCollectedCnt + ' • Day Fee: ' + dayFeeCnt + ' • Free Card: ' + freeCnt + ' • Cloud: ' + synced + '/' + total;
 
             const list = document.getElementById('logList');
             if (!total) {
@@ -1746,16 +1926,23 @@ function renderStaffScannerPage() {
                 return;
             }
             list.innerHTML = SCANS.map(s => {
-                const pill = s.feeStatus === 'PAID'
-                    ? '<span class="pill pill-g">✅ PAID</span>'
-                    : (s.feeStatus === 'NOT_PAID' ? '<span class="pill pill-r">❌ UNPAID</span>' : '<span class="pill pill-b">GATE</span>');
+                let pill = '<span class="pill pill-b">GATE</span>';
+                if (s.feeStatus === 'PAID') pill = '<span class="pill pill-g">✅ PAID</span>';
+                else if (s.feeStatus === 'MONTHLY_PAID') pill = '<span class="pill pill-g">💰 LKR ' + Number(s.collectedAmount || 0).toLocaleString() + '</span>';
+                else if (s.feeStatus === 'DAY_FEE') pill = '<span class="pill pill-c">💵 DAY ' + Number(s.collectedAmount || 0).toLocaleString() + '</span>';
+                else if (s.feeStatus === 'FREE_CARD') pill = '<span class="pill pill-p">🎟️ FREE</span>';
+                else if (s.feeStatus === 'NOT_PAID') pill = '<span class="pill pill-r">❌ NOT PAID</span>';
+
                 const cloudMark = s.uploaded ? '☁️' : '⏳';
+                const editBtn = (s.classId && s.feeStatus !== 'PAID')
+                    ? '<button class="btn-edit-fee" onclick="reopenFeeEditor(' + escHtml(JSON.stringify(s.scanId)) + ')" title="Change Fee Status">✎ Fee</button>'
+                    : '';
                 return '<div class="log-item">' +
                     '<div class="log-left">' +
                         '<div class="log-name">' + escHtml(s.studentName) + ' <span style="color:#94a3b8; font-weight:600; font-size:11.5px;">(' + escHtml(s.studentCode) + ')</span></div>' +
                         '<div class="log-sub">' + escHtml(s.className) + ' &bull; ' + escHtml(s.timeStr) + ' &bull; ' + cloudMark + '</div>' +
                     '</div>' +
-                    '<div style="display:flex; align-items:center; gap:5px;">' + pill +
+                    '<div style="display:flex; align-items:center; gap:5px;">' + pill + editBtn +
                         '<button class="btn-del" onclick="removeScan(' + escHtml(JSON.stringify(s.scanId)) + ')" title="Remove from phone log">✕</button>' +
                     '</div>' +
                 '</div>';
@@ -1878,6 +2065,9 @@ async function handleRequest(req, res) {
                 const d = sc.date || getSlDateStr();
                 const cid = (sc.classId !== null && sc.classId !== undefined && sc.classId !== '') ? Number(sc.classId) : null;
                 const k = `${sc.studentCode}|${cid || ''}|${d}`;
+                const feeStatus = String(sc.feeStatus || 'GENERAL').trim();
+                const paymentType = String(sc.paymentType || 'NONE').trim();
+                const collectedAmount = Math.max(0, Number(sc.collectedAmount || 0));
                 const prev = byKey.get(k);
                 if (!prev) {
                     byKey.set(k, {
@@ -1890,10 +2080,25 @@ async function handleRequest(req, res) {
                         date: d,
                         timeStr: String(sc.timeStr || getSlNow().toISOString().slice(11, 19)),
                         staffName: String(sc.staffName || 'MobileStaff').trim(),
-                        feeStatus: String(sc.feeStatus || 'GENERAL').trim(),
+                        feeStatus: feeStatus,
+                        paymentType: paymentType,
+                        collectedAmount: collectedAmount,
                         syncedToDesktop: false,
                         receivedAt: new Date().toISOString()
                     });
+                    savedCount++;
+                } else if (
+                    prev.feeStatus !== feeStatus ||
+                    String(prev.paymentType || 'NONE') !== paymentType ||
+                    Number(prev.collectedAmount || 0) !== collectedAmount
+                ) {
+                    // Staff updated student's gate fee status (e.g., NOT_PAID -> DAY_FEE / MONTHLY_PAID / FREE_CARD)
+                    prev.feeStatus = feeStatus;
+                    prev.paymentType = paymentType;
+                    prev.collectedAmount = collectedAmount;
+                    prev.staffName = String(sc.staffName || prev.staffName || 'MobileStaff').trim();
+                    prev.syncedToDesktop = false;
+                    prev.updatedAt = new Date().toISOString();
                     savedCount++;
                 }
             });
